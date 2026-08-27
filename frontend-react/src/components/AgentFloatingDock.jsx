@@ -1,33 +1,32 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useTelemetry } from '../context/TelemetryContext';
+import { agentApi } from '../services/agentApi';
 import {
   Bot,
-  Sparkles,
   Maximize2,
   Minimize2,
   X,
-  Zap,
   Activity,
-  ShieldAlert,
   Send,
   Trash2,
-  LineChart,
-  BarChart3,
   ArrowLeftRight,
-  ChevronRight,
-  TrendingUp,
-  Cpu
+  Sparkles,
+  CheckCircle2,
+  AlertTriangle,
+  RefreshCw
 } from 'lucide-react';
 
 export const AgentFloatingDock = () => {
+  const { selectedAsset } = useTelemetry();
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [panelWidth, setPanelWidth] = useState(480); // Default expanded width in px
+  const [panelWidth, setPanelWidth] = useState(480);
   const [isResizing, setIsResizing] = useState(false);
   const [messages, setMessages] = useState([]);
   const [canvasArtifacts, setCanvasArtifacts] = useState([]);
   const [inputQuery, setInputQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedAsset, setSelectedAsset] = useState('FS-031');
+  const [isBackendOnline, setIsBackendOnline] = useState(true);
 
   const messagesEndRef = useRef(null);
 
@@ -38,10 +37,12 @@ export const AgentFloatingDock = () => {
   useEffect(() => {
     if (isOpen) {
       scrollToBottom();
+      // Check backend status on opening
+      agentApi.checkHealth().then(online => setIsBackendOnline(online));
     }
   }, [messages, isOpen]);
 
-  // ─── Horizontal Drag-to-Resize Handler ───
+  // Horizontal Drag-to-Resize Handler
   const startResizing = useCallback((e) => {
     e.preventDefault();
     setIsResizing(true);
@@ -79,7 +80,7 @@ export const AgentFloatingDock = () => {
     };
   }, [isResizing, resize, stopResizing]);
 
-  // Agent streaming response handler
+  // Real Streaming Agent Message Handler
   const handleSendMessage = (queryText) => {
     const text = queryText || inputQuery;
     if (!text.trim() || isLoading) return;
@@ -95,7 +96,7 @@ export const AgentFloatingDock = () => {
         id: agentMsgId,
         sender: 'agent',
         text: '',
-        status: 'Connecting to Autonomous Agent Runtime...',
+        status: 'Initiating Supervisor Agent...',
         timestamp
       }
     ];
@@ -104,65 +105,84 @@ export const AgentFloatingDock = () => {
     setInputQuery('');
     setIsLoading(true);
 
-    setTimeout(() => {
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === agentMsgId
-            ? { ...msg, status: 'Fetching Real-Time Telemetry & History (Port 8081)...' }
-            : msg
-        )
-      );
-    }, 600);
+    let accumulatedText = '';
 
-    setTimeout(() => {
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === agentMsgId
-            ? { ...msg, status: 'Executing Engineering Calc Engine (Port 8083)...' }
-            : msg
-        )
-      );
-    }, 1200);
-
-    setTimeout(() => {
-      const artifact1 = {
-        id: `art-${Date.now()}-1`,
-        type: 'telemetry_trend',
-        title: 'Intake Pressure (PIP) vs Motor Temp 24h Trend',
-        assetId: selectedAsset,
-        metrics: [
-          { label: 'PIP (PSI)', value: '1,420.5', change: '-14%', status: 'warning' },
-          { label: 'Motor Temp (°C)', value: '98.4', change: '+8%', status: 'fault' },
-          { label: 'TDH (ft)', value: '4,850', change: 'Optimal', status: 'healthy' }
-        ],
-        bars: [1680, 1650, 1600, 1540, 1490, 1450, 1420]
-      };
-
-      setCanvasArtifacts((prev) => [artifact1, ...prev]);
-
+    agentApi.streamAgentRun(
+      { user_query: text, asset_id: selectedAsset || 'FS-010' },
+      (evt) => {
+        if (evt.type === 'status') {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === agentMsgId ? { ...msg, status: evt.message } : msg
+            )
+          );
+        } else if (evt.type === 'text_delta') {
+          accumulatedText += evt.delta;
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === agentMsgId
+                ? { ...msg, status: null, text: accumulatedText }
+                : msg
+            )
+          );
+        } else if (evt.type === 'advisory') {
+          const adv = evt.advisory;
+          if (adv?.recommended_action) {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === agentMsgId
+                  ? {
+                      ...msg,
+                      actionCard: {
+                        title: adv.recommended_action.action_title,
+                        urgency: adv.recommended_action.urgency || 'MEDIUM',
+                        confidence: adv.confidence_score || 0.85
+                      }
+                    }
+                  : msg
+              )
+            );
+          }
+        } else if (evt.type === 'generative_ui' && evt.kind === 'plotly_chart') {
+          setCanvasArtifacts((prev) => [
+            {
+              id: evt.chart_id || `art-${Date.now()}`,
+              type: 'plotly_chart',
+              title: evt.title,
+              data: evt.data,
+              layout: evt.layout
+            },
+            ...prev
+          ]);
+        } else if (evt.type === 'done') {
+          setIsLoading(false);
+        }
+      }
+    ).catch((err) => {
+      console.warn('[AgentFloatingDock] Error streaming agent run:', err);
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === agentMsgId
             ? {
                 ...msg,
                 status: null,
-                text: `### ⚡ Diagnostic Summary for **${selectedAsset}**\n\n- **Intake Pressure (PIP)**: \`1,420.5 PSI\` (▼ 14% past 2h)\n- **Motor Temperature**: \`98.4 °C\` (▲ High Thermal Load)\n- **BEP Operating Point**: \`78.2%\` (Gas Interference Zone)\n\n#### 🔬 Engineering Analysis\nDeterministic calculations indicate a **Total Dynamic Head (TDH)** of **4,850 ft** with an estimated intake gas fraction of **18.4%**. The motor load is operating at **112% of nameplate rating**.`,
-                actionCard: {
-                  title: 'Increase VSD frequency by 2.5 Hz to clear fluid drawdown and stabilize intake pressure.',
-                  urgency: 'HIGH',
-                  confidence: 0.94
-                }
+                text: `⚠️ Unable to connect to Agent Jane backend.\n\n*Note:* Start the agent gateway (\`run_agent_server.py\` on port \`:8090\`) for live execution.`
               }
             : msg
         )
       );
       setIsLoading(false);
-    }, 2200);
+    });
+  };
+
+  const handleClearChat = () => {
+    setMessages([]);
+    setCanvasArtifacts([]);
   };
 
   return (
     <div style={{ zIndex: 9999, position: 'relative' }}>
-      {/* ─── Floating Launcher Notch Button (Using /Agent_launcer.png) ─── */}
+      {/* ─── Floating Launcher Notch Button ─── */}
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
@@ -180,7 +200,7 @@ export const AgentFloatingDock = () => {
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.transform = 'translateY(-2px) scale(1.05)';
-            e.currentTarget.style.filter = 'drop-shadow(0 12px 24px rgba(2, 132, 199, 0.4))';
+            e.currentTarget.style.filter = 'drop-shadow(0 12px 24px rgba(0, 229, 255, 0.3))';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.transform = 'translateY(0) scale(1.0)';
@@ -210,9 +230,9 @@ export const AgentFloatingDock = () => {
               height: '52px',
               padding: '0 18px',
               borderRadius: '26px',
-              background: '#ffffff',
-              border: '1.5px solid #0284c7',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-color)',
+              boxShadow: 'var(--shadow-card)',
               alignItems: 'center',
               gap: '10px'
             }}
@@ -222,18 +242,26 @@ export const AgentFloatingDock = () => {
               width: '32px',
               height: '32px',
               borderRadius: '10px',
-              background: '#0284c7',
+              background: 'var(--accent-blue)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
             }}>
               <Bot size={20} color="#ffffff" />
-              <span style={{ position: 'absolute', top: '-2px', right: '-2px', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981', border: '2px solid #ffffff' }} />
+              <span style={{
+                position: 'absolute',
+                top: '-2px',
+                right: '-2px',
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: 'var(--accent-emerald)',
+                border: '2px solid var(--bg-card)'
+              }} />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-              <span style={{ fontSize: '0.85rem', fontWeight: '800', color: '#0f172a' }}>Agent Jane</span>
-              <span style={{ fontSize: '0.68rem', color: '#0284c7', fontWeight: '700' }}>APM Copilot</span>
-            </div>
+            <span style={{ fontSize: '0.88rem', fontWeight: '700', color: 'var(--text-primary)' }}>
+              Agent Jane
+            </span>
           </div>
         </button>
       )}
@@ -249,125 +277,102 @@ export const AgentFloatingDock = () => {
             height: '620px',
             maxHeight: '88vh',
             maxWidth: '94vw',
-            backgroundColor: '#ffffff',
-            border: '1px solid #cbd5e1',
-            borderRadius: '16px',
-            boxShadow: '0 20px 50px rgba(15, 23, 42, 0.18), 0 4px 16px rgba(2, 132, 199, 0.12)',
+            backgroundColor: 'var(--bg-card)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '14px',
+            boxShadow: 'var(--shadow-card)',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
-            transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+            transition: 'all 0.25s ease-out',
             zIndex: 9999
           }}
         >
-          {/* Header */}
+          {/* Minimal Header */}
           <div style={{
-            padding: '14px 18px',
-            background: 'rgba(255, 255, 255, 0.95)',
-            backdropFilter: 'blur(12px)',
-            borderBottom: '1px solid #e2e8f0',
+            padding: '12px 16px',
+            background: 'var(--bg-card-header)',
+            borderBottom: '1px solid var(--border-color)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            userSelect: 'none',
-            shrink: 0
+            userSelect: 'none'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{
                 position: 'relative',
-                width: '34px',
-                height: '34px',
-                borderRadius: '10px',
-                background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)',
+                width: '30px',
+                height: '30px',
+                borderRadius: '8px',
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--border-color)',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 2px 8px rgba(2, 132, 199, 0.25)'
+                justifyContent: 'center'
               }}>
-                <Bot size={20} color="#ffffff" strokeWidth={2.2} />
+                <Bot size={18} color="var(--accent-cyan)" />
                 <span style={{
                   position: 'absolute',
                   top: '-2px',
                   right: '-2px',
-                  width: '9px',
-                  height: '9px',
+                  width: '8px',
+                  height: '8px',
                   borderRadius: '50%',
-                  backgroundColor: '#10b981',
-                  border: '2px solid #ffffff'
+                  backgroundColor: isBackendOnline ? 'var(--accent-emerald)' : 'var(--accent-amber)',
+                  border: '2px solid var(--bg-card)'
                 }} />
               </div>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '0.92rem', fontWeight: '700', color: '#0f172a', letterSpacing: '-0.01em' }}>
-                    Agent Jane
-                  </span>
-                  <span style={{
-                    fontSize: '0.68rem',
-                    padding: '2px 8px',
-                    borderRadius: '12px',
-                    background: '#f0f9ff',
-                    color: '#0284c7',
-                    fontWeight: '700',
-                    border: '1px solid #bae6fd'
-                  }}>
-                    APM Copilot
-                  </span>
-                </div>
-                <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '1px' }}>
-                  Asset: <strong style={{ color: '#0f172a' }}>{selectedAsset}</strong> // Autonomous Agent
-                </div>
-              </div>
+              <span style={{
+                fontSize: '0.92rem',
+                fontWeight: '700',
+                color: 'var(--text-primary)',
+                fontFamily: 'var(--font-sans)'
+              }}>
+                Agent Jane
+              </span>
             </div>
 
-            {/* Expand & Close Controls */}
+            {/* Minimal Header Actions */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {messages.length > 0 && (
+                <button
+                  onClick={handleClearChat}
+                  title="Clear Chat"
+                  className="scada-btn"
+                  style={{ padding: '4px 8px', fontSize: '0.72rem' }}
+                >
+                  <Trash2 size={13} />
+                </button>
+              )}
               <button
                 onClick={() => setIsExpanded(true)}
-                title="Expand to Side-by-Side Resizable Workspace"
-                style={{
-                  padding: '6px 12px',
-                  background: '#f0f9ff',
-                  border: '1px solid #bae6fd',
-                  borderRadius: '8px',
-                  color: '#0284c7',
-                  fontSize: '0.72rem',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  transition: 'all 0.15s ease'
-                }}
+                title="Expand Workspace"
+                className="scada-btn"
+                style={{ padding: '4px 10px', fontSize: '0.75rem' }}
               >
                 <Maximize2 size={13} />
                 <span>Expand</span>
               </button>
               <button
                 onClick={() => setIsOpen(false)}
-                title="Close Agent Dialog"
-                style={{
-                  padding: '6px',
-                  background: '#f8fafc',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '8px',
-                  color: '#64748b',
-                  cursor: 'pointer'
-                }}
+                title="Close Agent"
+                className="scada-btn"
+                style={{ padding: '4px 8px' }}
               >
-                <X size={16} />
+                <X size={15} />
               </button>
             </div>
           </div>
 
-          {/* Chat Stream */}
+          {/* Minimal Chat Stream */}
           <div style={{
             flex: 1,
             overflowY: 'auto',
-            padding: '16px',
+            padding: '14px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '14px',
-            backgroundColor: '#f8fafc'
+            gap: '12px',
+            backgroundColor: 'var(--bg-primary)'
           }}>
             {messages.length === 0 && (
               <div style={{
@@ -377,110 +382,145 @@ export const AgentFloatingDock = () => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 textAlign: 'center',
-                padding: '24px 16px',
-                gap: '12px'
+                padding: '20px 16px'
               }}>
                 <div style={{
-                  padding: '14px',
-                  background: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)',
-                  borderRadius: '16px',
-                  border: '1px solid #93c5fd'
+                  width: '44px',
+                  height: '44px',
+                  borderRadius: '12px',
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border-color)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: '12px'
                 }}>
-                  <Sparkles size={28} color="#0284c7" />
+                  <Sparkles size={22} color="var(--accent-cyan)" />
                 </div>
-                <div>
-                  <h4 style={{ fontSize: '0.88rem', fontWeight: '800', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-                    Autonomous APM Advisory Ready
-                  </h4>
-                  <p style={{ fontSize: '0.78rem', color: '#64748b', maxWidth: '320px', lineHeight: '1.5', marginTop: '4px' }}>
-                    Ask Agent Jane about intake drawdown, gas interference, or motor temperature. Click <strong>Expand</strong> for resizable split view!
-                  </p>
-                </div>
+                <h4 style={{
+                  fontSize: '0.9rem',
+                  fontWeight: '700',
+                  color: 'var(--text-primary)',
+                  marginBottom: '6px'
+                }}>
+                  Autonomous APM Advisory
+                </h4>
+                <p style={{
+                  fontSize: '0.76rem',
+                  color: 'var(--text-muted)',
+                  maxWidth: '320px',
+                  lineHeight: '1.4',
+                  marginBottom: '16px'
+                }}>
+                  Ask Agent Jane about live telemetry, intake drawdown, gas interference, or pump performance.
+                </p>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '340px', marginTop: '12px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '340px' }}>
                   <button
-                    onClick={() => handleSendMessage('Analyze motor temperature spikes and intake drawdown.')}
+                    onClick={() => handleSendMessage(`Diagnose current operational telemetry for ${selectedAsset || 'active well'}`)}
+                    className="scada-btn"
                     style={{
-                      padding: '11px 14px',
-                      background: '#ffffff',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '10px',
-                      color: '#0f172a',
-                      fontSize: '0.78rem',
-                      fontWeight: '600',
-                      textAlign: 'left',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
+                      width: '100%',
                       justifyContent: 'space-between',
-                      boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
-                      transition: 'all 0.15s ease'
+                      fontSize: '0.76rem',
+                      padding: '8px 12px'
                     }}
                   >
-                    <span>Diagnose drawdown & motor temp</span>
-                    <Zap size={14} color="#0284c7" />
+                    <span>Diagnose active well telemetry</span>
+                    <Sparkles size={13} color="var(--accent-cyan)" />
+                  </button>
+                  <button
+                    onClick={() => handleSendMessage('Check gas interference & drawdown risk')}
+                    className="scada-btn"
+                    style={{
+                      width: '100%',
+                      justifyContent: 'space-between',
+                      fontSize: '0.76rem',
+                      padding: '8px 12px'
+                    }}
+                  >
+                    <span>Check gas interference & drawdown</span>
+                    <Activity size={13} color="var(--accent-blue)" />
                   </button>
                 </div>
               </div>
             )}
 
             {messages.map((msg) => (
-              <div
-                key={msg.id}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: msg.sender === 'user' ? 'flex-end' : 'flex-start'
-                }}
-              >
+              <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 {msg.sender === 'user' ? (
                   <div style={{
+                    alignSelf: 'flex-end',
                     maxWidth: '85%',
-                    padding: '10px 14px',
-                    background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-                    borderRadius: '14px 14px 2px 14px',
+                    background: 'var(--accent-blue)',
                     color: '#ffffff',
+                    padding: '8px 12px',
+                    borderRadius: '12px 12px 2px 12px',
                     fontSize: '0.8rem',
-                    fontWeight: '500'
+                    fontFamily: 'var(--font-sans)',
+                    lineHeight: '1.4'
                   }}>
                     {msg.text}
                   </div>
                 ) : (
-                  <div style={{ width: '100%', display: 'flex', gap: '10px' }}>
-                    <div style={{
-                      width: '30px',
-                      height: '30px',
-                      borderRadius: '8px',
-                      background: '#0284c7',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: '800',
-                      fontSize: '0.78rem',
-                      color: '#ffffff',
-                      shrink: 0
-                    }}>
-                      J
-                    </div>
-                    <div style={{
-                      flex: 1,
-                      background: '#ffffff',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '2px 12px 12px 12px',
-                      padding: '12px',
-                      fontSize: '0.8rem',
-                      color: '#0f172a',
-                      whiteSpace: 'pre-wrap',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
-                    }}>
-                      {msg.status && (
-                        <div style={{ fontSize: '0.72rem', color: '#0284c7', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                          <Activity size={12} className="live-pulse" />
-                          <span>{msg.status}</span>
+                  <div style={{
+                    alignSelf: 'flex-start',
+                    maxWidth: '92%',
+                    background: 'var(--bg-card)',
+                    border: '1px solid var(--border-color)',
+                    padding: '10px 12px',
+                    borderRadius: '2px 12px 12px 12px',
+                    fontSize: '0.8rem',
+                    color: 'var(--text-primary)',
+                    fontFamily: 'var(--font-sans)',
+                    lineHeight: '1.45',
+                    whiteSpace: 'pre-wrap'
+                  }}>
+                    {msg.status && (
+                      <div style={{
+                        fontSize: '0.72rem',
+                        color: 'var(--accent-cyan)',
+                        fontWeight: '600',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        marginBottom: '6px',
+                        fontFamily: 'var(--font-mono)'
+                      }}>
+                        <Activity size={12} className="live-pulse" />
+                        <span>{msg.status}</span>
+                      </div>
+                    )}
+                    {msg.text}
+
+                    {msg.actionCard && (
+                      <div style={{
+                        marginTop: '10px',
+                        padding: '10px',
+                        background: 'var(--state-warning-bg)',
+                        border: '1px solid var(--state-warning-border)',
+                        borderRadius: '6px',
+                        fontSize: '0.75rem'
+                      }}>
+                        <div style={{ fontWeight: '700', color: 'var(--state-warning-text)', marginBottom: '4px' }}>
+                          ⚡ Recommended Action
                         </div>
-                      )}
-                      {msg.text}
-                    </div>
+                        <div style={{ color: 'var(--text-primary)', marginBottom: '6px' }}>
+                          {msg.actionCard.title}
+                        </div>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          fontSize: '0.7rem',
+                          color: 'var(--text-muted)',
+                          fontFamily: 'var(--font-mono)'
+                        }}>
+                          <span>Priority: {msg.actionCard.urgency}</span>
+                          <span>Confidence: {Math.round(msg.actionCard.confidence * 100)}%</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -488,53 +528,39 @@ export const AgentFloatingDock = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input Composer */}
+          {/* Minimal Input Bar */}
           <div style={{
-            padding: '12px 14px',
-            background: '#ffffff',
-            borderTop: '1px solid #e2e8f0',
+            padding: '10px 12px',
+            background: 'var(--bg-card-header)',
+            borderTop: '1px solid var(--border-color)',
             display: 'flex',
             gap: '8px'
           }}>
             <input
               type="text"
-              placeholder="Agent box query (e.g. Diagnose drawdown for FS-031)..."
+              placeholder={`Ask Agent Jane about ${selectedAsset || 'well telemetry'}...`}
               value={inputQuery}
               onChange={(e) => setInputQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-              style={{
-                flex: 1,
-                padding: '10px 14px',
-                background: '#f8fafc',
-                border: '1px solid #cbd5e1',
-                borderRadius: '10px',
-                color: '#0f172a',
-                fontSize: '0.78rem',
-                outline: 'none'
-              }}
+              className="scada-input"
+              style={{ flex: 1, padding: '8px 12px', fontSize: '0.8rem' }}
             />
             <button
               onClick={() => handleSendMessage()}
               disabled={isLoading || !inputQuery.trim()}
+              className="scada-btn scada-btn-primary"
               style={{
-                padding: '10px 16px',
-                background: inputQuery.trim() ? 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)' : '#e2e8f0',
-                border: 'none',
-                borderRadius: '10px',
-                color: inputQuery.trim() ? '#ffffff' : '#94a3b8',
-                fontWeight: '700',
-                cursor: inputQuery.trim() ? 'pointer' : 'not-allowed',
-                fontSize: '0.78rem',
-                boxShadow: inputQuery.trim() ? '0 4px 12px rgba(2, 132, 199, 0.3)' : 'none'
+                opacity: inputQuery.trim() ? 1 : 0.5,
+                cursor: inputQuery.trim() ? 'pointer' : 'not-allowed'
               }}
             >
-              Send
+              <Send size={14} />
             </button>
           </div>
         </div>
       )}
 
-      {/* ─── EXPANDED SIDE-BY-SIDE RESIZABLE SLIDER WORKSPACE (Ultra-Sleek Modern Light Theme) ─── */}
+      {/* ─── EXPANDED RESIZABLE SLIDER VIEW ─── */}
       {isOpen && isExpanded && (
         <div
           style={{
@@ -543,9 +569,9 @@ export const AgentFloatingDock = () => {
             right: 0,
             bottom: 0,
             width: `${panelWidth}px`,
-            backgroundColor: '#ffffff',
-            borderLeft: '1px solid #e2e8f0',
-            boxShadow: '-12px 0 40px rgba(15, 23, 42, 0.12), -2px 0 10px rgba(2, 132, 199, 0.05)',
+            backgroundColor: 'var(--bg-card)',
+            borderLeft: '1px solid var(--border-color)',
+            boxShadow: 'var(--shadow-card)',
             zIndex: 99999,
             display: 'flex',
             flexDirection: 'column',
@@ -553,10 +579,10 @@ export const AgentFloatingDock = () => {
             transition: isResizing ? 'none' : 'width 0.15s ease-out'
           }}
         >
-          {/* ─── SLEEK HORIZONTAL RESIZE BOUNDARY HANDLE (<->) ─── */}
+          {/* Drag Resize Handle */}
           <div
             onMouseDown={startResizing}
-            title="Drag left/right to resize Agent side panel"
+            title="Drag to resize panel"
             style={{
               position: 'absolute',
               left: 0,
@@ -564,369 +590,134 @@ export const AgentFloatingDock = () => {
               bottom: 0,
               width: '6px',
               cursor: 'col-resize',
-              backgroundColor: isResizing ? '#0284c7' : 'transparent',
+              backgroundColor: isResizing ? 'var(--accent-cyan)' : 'transparent',
               zIndex: 100000,
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'background-color 0.2s ease'
-            }}
-            onMouseEnter={(e) => {
-              if (!isResizing) e.currentTarget.style.backgroundColor = 'rgba(2, 132, 199, 0.4)';
-            }}
-            onMouseLeave={(e) => {
-              if (!isResizing) e.currentTarget.style.backgroundColor = 'transparent';
+              justifyContent: 'center'
             }}
           >
-            {/* Visual Drag Pill Grip */}
             <div style={{
-              width: '20px',
-              height: '44px',
-              borderRadius: '10px',
-              background: '#ffffff',
-              border: '1.5px solid #0284c7',
-              boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)',
+              width: '18px',
+              height: '36px',
+              borderRadius: '6px',
+              background: 'var(--bg-card-header)',
+              border: '1px solid var(--border-color)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#0284c7',
-              transition: 'transform 0.15s ease'
+              color: 'var(--text-muted)'
             }}>
-              <ArrowLeftRight size={12} strokeWidth={2.5} />
+              <ArrowLeftRight size={11} />
             </div>
           </div>
 
-          {/* Sleek Modern Light Header */}
+          {/* Expanded Minimal Header */}
           <div style={{
-            padding: '14px 20px',
-            paddingLeft: '22px',
-            background: 'rgba(255, 255, 255, 0.92)',
-            backdropFilter: 'blur(12px)',
-            borderBottom: '1px solid #e2e8f0',
+            padding: '12px 16px',
+            background: 'var(--bg-card-header)',
+            borderBottom: '1px solid var(--border-color)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            userSelect: 'none',
-            shrink: 0
+            userSelect: 'none'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{
-                position: 'relative',
-                width: '36px',
-                height: '36px',
-                borderRadius: '10px',
-                background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 3px 10px rgba(2, 132, 199, 0.3)'
-              }}>
-                <Bot size={22} color="#ffffff" strokeWidth={2.2} />
-                <span style={{
-                  position: 'absolute',
-                  top: '-2px',
-                  right: '-2px',
-                  width: '9px',
-                  height: '9px',
-                  borderRadius: '50%',
-                  backgroundColor: '#10b981',
-                  border: '2px solid #ffffff'
-                }} />
-              </div>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#0f172a', letterSpacing: '-0.01em' }}>
-                    Agent Jane
-                  </h3>
-                  <span style={{
-                    fontSize: '0.65rem',
-                    padding: '2px 8px',
-                    borderRadius: '12px',
-                    background: '#f0f9ff',
-                    color: '#0284c7',
-                    fontWeight: '700',
-                    border: '1px solid #bae6fd'
-                  }}>
-                    APM Copilot
-                  </span>
-                </div>
-                <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '1px' }}>
-                  Resizable Split View <span style={{ color: '#0284c7', fontWeight: '600' }}>({panelWidth}px)</span> · Target: <strong style={{ color: '#0f172a' }}>{selectedAsset}</strong>
-                </div>
-              </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Bot size={18} color="var(--accent-cyan)" />
+              <span style={{ fontSize: '0.92rem', fontWeight: '700', color: 'var(--text-primary)' }}>
+                Agent Jane Workspace
+              </span>
             </div>
 
-            {/* Collapse & Close Controls */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <button
                 onClick={() => setIsExpanded(false)}
-                title="Collapse to Floating Window"
-                style={{
-                  padding: '6px 12px',
-                  background: '#ffffff',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '8px',
-                  color: '#475569',
-                  fontSize: '0.72rem',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                  transition: 'all 0.15s ease'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#0284c7'}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#cbd5e1'}
+                title="Collapse to Window"
+                className="scada-btn"
+                style={{ padding: '4px 10px', fontSize: '0.75rem' }}
               >
                 <Minimize2 size={13} />
                 <span>Collapse</span>
               </button>
               <button
                 onClick={() => setIsOpen(false)}
-                title="Close Agent"
-                style={{
-                  padding: '6px',
-                  background: '#f8fafc',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '8px',
-                  color: '#64748b',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                title="Close"
+                className="scada-btn"
+                style={{ padding: '4px 8px' }}
               >
-                <X size={16} />
+                <X size={15} />
               </button>
             </div>
           </div>
 
-          {/* Conversation Stream */}
+          {/* Expanded Content Area */}
           <div style={{
             flex: 1,
             overflowY: 'auto',
-            padding: '20px',
-            paddingLeft: '24px',
+            padding: '14px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '16px',
-            backgroundColor: '#f8fafc',
-            backgroundImage: 'radial-gradient(circle at 50% 20%, rgba(2, 132, 199, 0.03), transparent 70%)'
+            gap: '12px',
+            backgroundColor: 'var(--bg-primary)'
           }}>
             {messages.length === 0 && (
               <div style={{
-                height: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
                 textAlign: 'center',
-                padding: '24px',
-                gap: '14px'
+                padding: '30px 16px',
+                color: 'var(--text-muted)',
+                fontSize: '0.8rem'
               }}>
-                <div style={{
-                  padding: '16px',
-                  background: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)',
-                  borderRadius: '20px',
-                  boxShadow: '0 8px 20px rgba(2, 132, 199, 0.15)'
-                }}>
-                  <Sparkles size={32} color="#0284c7" />
-                </div>
-                <div>
-                  <h4 style={{ fontSize: '0.95rem', fontWeight: '800', color: '#0f172a', letterSpacing: '-0.01em' }}>
-                    Agent Jane Advisory Ready
-                  </h4>
-                  <p style={{ fontSize: '0.78rem', color: '#64748b', maxWidth: '340px', lineHeight: '1.5', marginTop: '4px' }}>
-                    Your ESP-APM Dashboard remains active on the left. Drag the divider handle to resize the Agent side panel!
-                  </p>
-                </div>
-
-                {/* Modern Prompt Cards */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', maxWidth: '360px', marginTop: '8px' }}>
-                  <button
-                    onClick={() => handleSendMessage('Analyze motor temperature spikes and intake drawdown.')}
-                    style={{
-                      padding: '12px 16px',
-                      background: '#ffffff',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '12px',
-                      color: '#0f172a',
-                      fontSize: '0.78rem',
-                      fontWeight: '600',
-                      textAlign: 'left',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-                      transition: 'all 0.15s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = '#0284c7';
-                      e.currentTarget.style.transform = 'translateY(-1px)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = '#e2e8f0';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#f0f9ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Zap size={14} color="#0284c7" />
-                      </div>
-                      <span>Diagnose drawdown & motor temp</span>
-                    </div>
-                    <ChevronRight size={14} color="#94a3b8" />
-                  </button>
-
-                  <button
-                    onClick={() => handleSendMessage('Check intake gas interference & BEP pump curve deviation.')}
-                    style={{
-                      padding: '12px 16px',
-                      background: '#ffffff',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '12px',
-                      color: '#0f172a',
-                      fontSize: '0.78rem',
-                      fontWeight: '600',
-                      textAlign: 'left',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-                      transition: 'all 0.15s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = '#0284c7';
-                      e.currentTarget.style.transform = 'translateY(-1px)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = '#e2e8f0';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#f0f9ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <TrendingUp size={14} color="#0284c7" />
-                      </div>
-                      <span>Check gas interference & BEP curve</span>
-                    </div>
-                    <ChevronRight size={14} color="#94a3b8" />
-                  </button>
+                <Sparkles size={24} color="var(--accent-cyan)" style={{ marginBottom: '8px' }} />
+                <div>Agent Jane Expanded Engineering Workspace</div>
+                <div style={{ fontSize: '0.74rem', marginTop: '4px' }}>
+                  Ask questions to render interactive charts and diagnostic telemetry.
                 </div>
               </div>
             )}
 
             {messages.map((msg) => (
-              <div
-                key={msg.id}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: msg.sender === 'user' ? 'flex-end' : 'flex-start'
-                }}
-              >
+              <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 {msg.sender === 'user' ? (
                   <div style={{
-                    maxWidth: '88%',
-                    padding: '11px 16px',
-                    background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-                    borderRadius: '16px 16px 2px 16px',
+                    alignSelf: 'flex-end',
+                    maxWidth: '85%',
+                    background: 'var(--accent-blue)',
                     color: '#ffffff',
-                    fontSize: '0.8rem',
-                    fontWeight: '500',
-                    boxShadow: '0 3px 10px rgba(2, 132, 199, 0.2)'
+                    padding: '8px 12px',
+                    borderRadius: '12px 12px 2px 12px',
+                    fontSize: '0.8rem'
                   }}>
                     {msg.text}
-                    <div style={{ fontSize: '0.65rem', color: 'rgba(255, 255, 255, 0.7)', textAlign: 'right', marginTop: '4px' }}>
-                      {msg.timestamp}
-                    </div>
                   </div>
                 ) : (
-                  <div style={{ width: '100%', display: 'flex', gap: '10px' }}>
-                    <div style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '10px',
-                      background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: '800',
-                      fontSize: '0.8rem',
-                      color: '#ffffff',
-                      shrink: 0,
-                      boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)'
-                    }}>
-                      J
-                    </div>
-                    <div style={{
-                      flex: 1,
-                      background: '#ffffff',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '2px 14px 14px 14px',
-                      padding: '14px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '10px',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
-                    }}>
-                      {msg.status && (
-                        <div style={{
-                          padding: '8px 12px',
-                          background: '#f0f9ff',
-                          border: '1px solid #bae6fd',
-                          borderRadius: '8px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          fontSize: '0.75rem',
-                          color: '#0369a1'
-                        }}>
-                          <Activity size={14} className="live-pulse" />
-                          <span>{msg.status}</span>
-                        </div>
-                      )}
-
-                      {msg.text && (
-                        <div style={{ fontSize: '0.8rem', color: '#0f172a', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
-                          {msg.text}
-                        </div>
-                      )}
-
-                      {msg.actionCard && (
-                        <div style={{
-                          padding: '14px',
-                          background: '#fffbe6',
-                          border: '1px solid #ffe58f',
-                          borderRadius: '10px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '6px'
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <ShieldAlert size={16} color="#d46b08" />
-                              <span style={{ fontSize: '0.72rem', fontWeight: '800', color: '#d46b08', letterSpacing: '0.02em' }}>
-                                RECOMMENDED OPERATOR ACTION
-                              </span>
-                            </div>
-                            <span style={{ fontSize: '0.65rem', background: '#ffe58f', color: '#873800', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
-                              HIGH PRIORITY (94%)
-                            </span>
-                          </div>
-                          <div style={{ fontSize: '0.78rem', color: '#262626', fontWeight: '600', marginTop: '2px' }}>
-                            {msg.actionCard.title}
-                          </div>
-                        </div>
-                      )}
-
-                      <div style={{ fontSize: '0.65rem', color: '#94a3b8', textAlign: 'right' }}>
-                        {msg.timestamp}
+                  <div style={{
+                    alignSelf: 'flex-start',
+                    maxWidth: '94%',
+                    background: 'var(--bg-card)',
+                    border: '1px solid var(--border-color)',
+                    padding: '12px',
+                    borderRadius: '2px 12px 12px 12px',
+                    fontSize: '0.8rem',
+                    color: 'var(--text-primary)',
+                    lineHeight: '1.45',
+                    whiteSpace: 'pre-wrap'
+                  }}>
+                    {msg.status && (
+                      <div style={{
+                        fontSize: '0.72rem',
+                        color: 'var(--accent-cyan)',
+                        fontWeight: '600',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        marginBottom: '6px',
+                        fontFamily: 'var(--font-mono)'
+                      }}>
+                        <Activity size={12} className="live-pulse" />
+                        <span>{msg.status}</span>
                       </div>
-                    </div>
+                    )}
+                    {msg.text}
                   </div>
                 )}
               </div>
@@ -934,64 +725,28 @@ export const AgentFloatingDock = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* ─── SLEEK BOTTOM INPUT COMPOSER ("Agent box query") ─── */}
+          {/* Input Bar */}
           <div style={{
-            padding: '16px 20px',
-            paddingLeft: '24px',
-            background: '#ffffff',
-            borderTop: '1px solid #e2e8f0',
+            padding: '10px 12px',
+            background: 'var(--bg-card-header)',
+            borderTop: '1px solid var(--border-color)',
             display: 'flex',
-            gap: '10px',
-            alignItems: 'center',
-            shrink: 0
+            gap: '8px'
           }}>
             <input
               type="text"
-              placeholder="Agent box query (e.g. Diagnose drawdown for FS-031)..."
+              placeholder="Ask Agent Jane..."
               value={inputQuery}
               onChange={(e) => setInputQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-              style={{
-                flex: 1,
-                padding: '11px 16px',
-                background: '#f8fafc',
-                border: '1px solid #cbd5e1',
-                borderRadius: '10px',
-                color: '#0f172a',
-                fontSize: '0.8rem',
-                outline: 'none',
-                boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)',
-                transition: 'all 0.15s ease'
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = '#0284c7';
-                e.currentTarget.style.backgroundColor = '#ffffff';
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = '#cbd5e1';
-                e.currentTarget.style.backgroundColor = '#f8fafc';
-              }}
+              className="scada-input"
+              style={{ flex: 1, padding: '8px 12px', fontSize: '0.8rem' }}
             />
             <button
               onClick={() => handleSendMessage()}
               disabled={isLoading || !inputQuery.trim()}
-              style={{
-                padding: '11px 20px',
-                background: inputQuery.trim() ? 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)' : '#e2e8f0',
-                border: 'none',
-                borderRadius: '10px',
-                color: inputQuery.trim() ? '#ffffff' : '#94a3b8',
-                fontWeight: '700',
-                cursor: inputQuery.trim() ? 'pointer' : 'not-allowed',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontSize: '0.8rem',
-                boxShadow: inputQuery.trim() ? '0 4px 12px rgba(2, 132, 199, 0.3)' : 'none',
-                transition: 'all 0.15s ease'
-              }}
+              className="scada-btn scada-btn-primary"
             >
-              <span>Send</span>
               <Send size={14} />
             </button>
           </div>
