@@ -12,14 +12,16 @@ import {
   Trash2,
   LineChart,
   BarChart3,
-  GripVertical,
-  ArrowLeftRight
+  ArrowLeftRight,
+  ChevronRight,
+  TrendingUp,
+  Cpu
 } from 'lucide-react';
 
 export const AgentFloatingDock = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [panelWidth, setPanelWidth] = useState(520); // Default expanded width in px
+  const [panelWidth, setPanelWidth] = useState(480); // Default expanded width in px
   const [isResizing, setIsResizing] = useState(false);
   const [messages, setMessages] = useState([]);
   const [canvasArtifacts, setCanvasArtifacts] = useState([]);
@@ -53,7 +55,6 @@ export const AgentFloatingDock = () => {
     (e) => {
       if (isResizing) {
         const newWidth = window.innerWidth - e.clientX;
-        // Clamp width between 320px and 75% of window width
         const minW = 320;
         const maxW = Math.floor(window.innerWidth * 0.75);
         if (newWidth >= minW && newWidth <= maxW) {
@@ -237,7 +238,7 @@ export const AgentFloatingDock = () => {
         </button>
       )}
 
-      {/* ─── Compact Floating Box (Default Mode) ─── */}
+      {/* ─── Compact Floating Window (Default Mode) ─── */}
       {isOpen && !isExpanded && (
         <div
           style={{
@@ -261,8 +262,9 @@ export const AgentFloatingDock = () => {
         >
           {/* Header */}
           <div style={{
-            padding: '12px 18px',
-            background: 'linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%)',
+            padding: '14px 18px',
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(12px)',
             borderBottom: '1px solid #e2e8f0',
             display: 'flex',
             alignItems: 'center',
@@ -273,33 +275,38 @@ export const AgentFloatingDock = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{
                 position: 'relative',
-                padding: '6px',
-                background: '#e0f2fe',
+                width: '34px',
+                height: '34px',
                 borderRadius: '10px',
-                border: '1px solid #bae6fd'
+                background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 2px 8px rgba(2, 132, 199, 0.25)'
               }}>
-                <Bot size={20} color="#0284c7" />
+                <Bot size={20} color="#ffffff" strokeWidth={2.2} />
                 <span style={{
                   position: 'absolute',
                   top: '-2px',
                   right: '-2px',
-                  width: '8px',
-                  height: '8px',
+                  width: '9px',
+                  height: '9px',
                   borderRadius: '50%',
-                  backgroundColor: '#10b981'
+                  backgroundColor: '#10b981',
+                  border: '2px solid #ffffff'
                 }} />
               </div>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '0.9rem', fontWeight: '800', color: '#0f172a' }}>
+                  <span style={{ fontSize: '0.92rem', fontWeight: '700', color: '#0f172a', letterSpacing: '-0.01em' }}>
                     Agent Jane
                   </span>
                   <span style={{
-                    fontSize: '0.65rem',
+                    fontSize: '0.68rem',
                     padding: '2px 8px',
                     borderRadius: '12px',
-                    background: '#e0f2fe',
-                    color: '#0369a1',
+                    background: '#f0f9ff',
+                    color: '#0284c7',
                     fontWeight: '700',
                     border: '1px solid #bae6fd'
                   }}>
@@ -307,7 +314,7 @@ export const AgentFloatingDock = () => {
                   </span>
                 </div>
                 <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '1px' }}>
-                  Asset: <strong>{selectedAsset}</strong> // Autonomous Agent
+                  Asset: <strong style={{ color: '#0f172a' }}>{selectedAsset}</strong> // Autonomous Agent
                 </div>
               </div>
             </div>
@@ -318,8 +325,8 @@ export const AgentFloatingDock = () => {
                 onClick={() => setIsExpanded(true)}
                 title="Expand to Side-by-Side Resizable Workspace"
                 style={{
-                  padding: '6px 10px',
-                  background: '#e0f2fe',
+                  padding: '6px 12px',
+                  background: '#f0f9ff',
                   border: '1px solid #bae6fd',
                   borderRadius: '8px',
                   color: '#0284c7',
@@ -328,10 +335,11 @@ export const AgentFloatingDock = () => {
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '5px'
+                  gap: '6px',
+                  transition: 'all 0.15s ease'
                 }}
               >
-                <Maximize2 size={14} />
+                <Maximize2 size={13} />
                 <span>Expand</span>
               </button>
               <button
@@ -339,14 +347,11 @@ export const AgentFloatingDock = () => {
                 title="Close Agent Dialog"
                 style={{
                   padding: '6px',
-                  background: '#f1f5f9',
-                  border: '1px solid #cbd5e1',
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
                   borderRadius: '8px',
                   color: '#64748b',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
+                  cursor: 'pointer'
                 }}
               >
                 <X size={16} />
@@ -377,37 +382,39 @@ export const AgentFloatingDock = () => {
               }}>
                 <div style={{
                   padding: '14px',
-                  background: '#e0f2fe',
+                  background: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)',
                   borderRadius: '16px',
-                  border: '1px solid #bae6fd'
+                  border: '1px solid #93c5fd'
                 }}>
                   <Sparkles size={28} color="#0284c7" />
                 </div>
                 <div>
-                  <h4 style={{ fontSize: '0.85rem', fontWeight: '800', color: '#0f172a', textTransform: 'uppercase' }}>
+                  <h4 style={{ fontSize: '0.88rem', fontWeight: '800', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
                     Autonomous APM Advisory Ready
                   </h4>
-                  <p style={{ fontSize: '0.75rem', color: '#64748b', maxWidth: '320px', lineHeight: '1.5', marginTop: '4px' }}>
-                    Ask Agent Jane about intake drawdown, gas interference, or motor temperature spikes. Click <strong>Expand</strong> for a resizable split dashboard view!
+                  <p style={{ fontSize: '0.78rem', color: '#64748b', maxWidth: '320px', lineHeight: '1.5', marginTop: '4px' }}>
+                    Ask Agent Jane about intake drawdown, gas interference, or motor temperature. Click <strong>Expand</strong> for resizable split view!
                   </p>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '320px', marginTop: '12px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '340px', marginTop: '12px' }}>
                   <button
                     onClick={() => handleSendMessage('Analyze motor temperature spikes and intake drawdown.')}
                     style={{
-                      padding: '10px 14px',
+                      padding: '11px 14px',
                       background: '#ffffff',
-                      border: '1px solid #cbd5e1',
+                      border: '1px solid #e2e8f0',
                       borderRadius: '10px',
                       color: '#0f172a',
-                      fontSize: '0.75rem',
+                      fontSize: '0.78rem',
                       fontWeight: '600',
                       textAlign: 'left',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'space-between'
+                      justifyContent: 'space-between',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
+                      transition: 'all 0.15s ease'
                     }}
                   >
                     <span>Diagnose drawdown & motor temp</span>
@@ -430,7 +437,7 @@ export const AgentFloatingDock = () => {
                   <div style={{
                     maxWidth: '85%',
                     padding: '10px 14px',
-                    background: '#0284c7',
+                    background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
                     borderRadius: '14px 14px 2px 14px',
                     color: '#ffffff',
                     fontSize: '0.8rem',
@@ -463,7 +470,8 @@ export const AgentFloatingDock = () => {
                       padding: '12px',
                       fontSize: '0.8rem',
                       color: '#0f172a',
-                      whiteSpace: 'pre-wrap'
+                      whiteSpace: 'pre-wrap',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
                     }}>
                       {msg.status && (
                         <div style={{ fontSize: '0.72rem', color: '#0284c7', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
@@ -490,7 +498,7 @@ export const AgentFloatingDock = () => {
           }}>
             <input
               type="text"
-              placeholder="Ask Agent Jane..."
+              placeholder="Agent box query (e.g. Diagnose drawdown for FS-031)..."
               value={inputQuery}
               onChange={(e) => setInputQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
@@ -509,14 +517,15 @@ export const AgentFloatingDock = () => {
               onClick={() => handleSendMessage()}
               disabled={isLoading || !inputQuery.trim()}
               style={{
-                padding: '10px 14px',
-                background: inputQuery.trim() ? '#0284c7' : '#cbd5e1',
+                padding: '10px 16px',
+                background: inputQuery.trim() ? 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)' : '#e2e8f0',
                 border: 'none',
                 borderRadius: '10px',
-                color: '#ffffff',
+                color: inputQuery.trim() ? '#ffffff' : '#94a3b8',
                 fontWeight: '700',
                 cursor: inputQuery.trim() ? 'pointer' : 'not-allowed',
-                fontSize: '0.78rem'
+                fontSize: '0.78rem',
+                boxShadow: inputQuery.trim() ? '0 4px 12px rgba(2, 132, 199, 0.3)' : 'none'
               }}
             >
               Send
@@ -525,7 +534,7 @@ export const AgentFloatingDock = () => {
         </div>
       )}
 
-      {/* ─── EXPANDED SIDE-BY-SIDE RESIZABLE SLIDER WORKSPACE ─── */}
+      {/* ─── EXPANDED SIDE-BY-SIDE RESIZABLE SLIDER WORKSPACE (Ultra-Sleek Modern Light Theme) ─── */}
       {isOpen && isExpanded && (
         <div
           style={{
@@ -535,8 +544,8 @@ export const AgentFloatingDock = () => {
             bottom: 0,
             width: `${panelWidth}px`,
             backgroundColor: '#ffffff',
-            borderLeft: '1.5px solid #cbd5e1',
-            boxShadow: '-16px 0 50px rgba(15, 23, 42, 0.18), -4px 0 16px rgba(2, 132, 199, 0.1)',
+            borderLeft: '1px solid #e2e8f0',
+            boxShadow: '-12px 0 40px rgba(15, 23, 42, 0.12), -2px 0 10px rgba(2, 132, 199, 0.05)',
             zIndex: 99999,
             display: 'flex',
             flexDirection: 'column',
@@ -544,16 +553,16 @@ export const AgentFloatingDock = () => {
             transition: isResizing ? 'none' : 'width 0.15s ease-out'
           }}
         >
-          {/* ─── HORIZONTAL DRAG-TO-RESIZE BOUNDARY HANDLE (<->) ─── */}
+          {/* ─── SLEEK HORIZONTAL RESIZE BOUNDARY HANDLE (<->) ─── */}
           <div
             onMouseDown={startResizing}
-            title="Drag left/right to resize Agent panel"
+            title="Drag left/right to resize Agent side panel"
             style={{
               position: 'absolute',
               left: 0,
               top: 0,
               bottom: 0,
-              width: '8px',
+              width: '6px',
               cursor: 'col-resize',
               backgroundColor: isResizing ? '#0284c7' : 'transparent',
               zIndex: 100000,
@@ -563,103 +572,114 @@ export const AgentFloatingDock = () => {
               transition: 'background-color 0.2s ease'
             }}
             onMouseEnter={(e) => {
-              if (!isResizing) e.currentTarget.style.backgroundColor = 'rgba(2, 132, 199, 0.3)';
+              if (!isResizing) e.currentTarget.style.backgroundColor = 'rgba(2, 132, 199, 0.4)';
             }}
             onMouseLeave={(e) => {
               if (!isResizing) e.currentTarget.style.backgroundColor = 'transparent';
             }}
           >
-            {/* Visual Drag Handle Icon */}
+            {/* Visual Drag Pill Grip */}
             <div style={{
               width: '20px',
-              height: '36px',
+              height: '44px',
               borderRadius: '10px',
               background: '#ffffff',
-              border: '1px solid #0284c7',
-              boxShadow: '0 2px 8px rgba(2, 132, 199, 0.25)',
+              border: '1.5px solid #0284c7',
+              boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#0284c7'
+              color: '#0284c7',
+              transition: 'transform 0.15s ease'
             }}>
-              <ArrowLeftRight size={12} />
+              <ArrowLeftRight size={12} strokeWidth={2.5} />
             </div>
           </div>
 
-          {/* Panel Header */}
+          {/* Sleek Modern Light Header */}
           <div style={{
-            padding: '14px 18px',
-            background: 'linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%)',
+            padding: '14px 20px',
+            paddingLeft: '22px',
+            background: 'rgba(255, 255, 255, 0.92)',
+            backdropFilter: 'blur(12px)',
             borderBottom: '1px solid #e2e8f0',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             userSelect: 'none',
-            shrink: 0,
-            paddingLeft: '20px'
+            shrink: 0
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{
                 position: 'relative',
-                padding: '6px',
-                background: '#e0f2fe',
+                width: '36px',
+                height: '36px',
                 borderRadius: '10px',
-                border: '1px solid #bae6fd'
+                background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 3px 10px rgba(2, 132, 199, 0.3)'
               }}>
-                <Bot size={20} color="#0284c7" />
+                <Bot size={22} color="#ffffff" strokeWidth={2.2} />
                 <span style={{
                   position: 'absolute',
                   top: '-2px',
                   right: '-2px',
-                  width: '8px',
-                  height: '8px',
+                  width: '9px',
+                  height: '9px',
                   borderRadius: '50%',
-                  backgroundColor: '#10b981'
+                  backgroundColor: '#10b981',
+                  border: '2px solid #ffffff'
                 }} />
               </div>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '0.9rem', fontWeight: '800', color: '#0f172a' }}>
-                    Agent Jane Side Panel
-                  </span>
+                  <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#0f172a', letterSpacing: '-0.01em' }}>
+                    Agent Jane
+                  </h3>
                   <span style={{
                     fontSize: '0.65rem',
                     padding: '2px 8px',
                     borderRadius: '12px',
-                    background: '#e0f2fe',
-                    color: '#0369a1',
+                    background: '#f0f9ff',
+                    color: '#0284c7',
                     fontWeight: '700',
                     border: '1px solid #bae6fd'
                   }}>
-                    Resizable Split View
+                    APM Copilot
                   </span>
                 </div>
-                <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '1px' }}>
-                  Drag left handle to adjust panel width ({panelWidth}px)
+                <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '1px' }}>
+                  Resizable Split View <span style={{ color: '#0284c7', fontWeight: '600' }}>({panelWidth}px)</span> · Target: <strong style={{ color: '#0f172a' }}>{selectedAsset}</strong>
                 </div>
               </div>
             </div>
 
-            {/* Minimize / Close Buttons */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {/* Collapse & Close Controls */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <button
                 onClick={() => setIsExpanded(false)}
                 title="Collapse to Floating Window"
                 style={{
-                  padding: '6px 10px',
+                  padding: '6px 12px',
                   background: '#ffffff',
                   border: '1px solid #cbd5e1',
                   borderRadius: '8px',
-                  color: '#64748b',
+                  color: '#475569',
                   fontSize: '0.72rem',
                   fontWeight: '600',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '5px'
+                  gap: '6px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                  transition: 'all 0.15s ease'
                 }}
+                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#0284c7'}
+                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#cbd5e1'}
               >
-                <Minimize2 size={14} />
+                <Minimize2 size={13} />
                 <span>Collapse</span>
               </button>
               <button
@@ -667,12 +687,15 @@ export const AgentFloatingDock = () => {
                 title="Close Agent"
                 style={{
                   padding: '6px',
-                  background: '#f1f5f9',
-                  border: '1px solid #cbd5e1',
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
                   borderRadius: '8px',
                   color: '#64748b',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
                 }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
               >
                 <X size={16} />
               </button>
@@ -683,12 +706,13 @@ export const AgentFloatingDock = () => {
           <div style={{
             flex: 1,
             overflowY: 'auto',
-            padding: '18px',
-            paddingLeft: '22px',
+            padding: '20px',
+            paddingLeft: '24px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '14px',
-            backgroundColor: '#f8fafc'
+            gap: '16px',
+            backgroundColor: '#f8fafc',
+            backgroundImage: 'radial-gradient(circle at 50% 20%, rgba(2, 132, 199, 0.03), transparent 70%)'
           }}>
             {messages.length === 0 && (
               <div style={{
@@ -699,26 +723,34 @@ export const AgentFloatingDock = () => {
                 justifyContent: 'center',
                 textAlign: 'center',
                 padding: '24px',
-                gap: '12px'
+                gap: '14px'
               }}>
-                <div style={{ padding: '16px', background: '#e0f2fe', borderRadius: '18px' }}>
+                <div style={{
+                  padding: '16px',
+                  background: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)',
+                  borderRadius: '20px',
+                  boxShadow: '0 8px 20px rgba(2, 132, 199, 0.15)'
+                }}>
                   <Sparkles size={32} color="#0284c7" />
                 </div>
-                <h4 style={{ fontSize: '0.9rem', fontWeight: '800', color: '#0f172a' }}>
-                  Side-by-Side Agent Advisory Ready
-                </h4>
-                <p style={{ fontSize: '0.78rem', color: '#64748b', maxWidth: '340px', lineHeight: '1.5' }}>
-                  Your ESP-APM Dashboard remains fully active on the left. Drag the divider handle to expand or shrink the Agent side panel!
-                </p>
+                <div>
+                  <h4 style={{ fontSize: '0.95rem', fontWeight: '800', color: '#0f172a', letterSpacing: '-0.01em' }}>
+                    Agent Jane Advisory Ready
+                  </h4>
+                  <p style={{ fontSize: '0.78rem', color: '#64748b', maxWidth: '340px', lineHeight: '1.5', marginTop: '4px' }}>
+                    Your ESP-APM Dashboard remains active on the left. Drag the divider handle to resize the Agent side panel!
+                  </p>
+                </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '340px', marginTop: '12px' }}>
+                {/* Modern Prompt Cards */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', maxWidth: '360px', marginTop: '8px' }}>
                   <button
                     onClick={() => handleSendMessage('Analyze motor temperature spikes and intake drawdown.')}
                     style={{
-                      padding: '10px 14px',
+                      padding: '12px 16px',
                       background: '#ffffff',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '10px',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '12px',
                       color: '#0f172a',
                       fontSize: '0.78rem',
                       fontWeight: '600',
@@ -726,11 +758,62 @@ export const AgentFloatingDock = () => {
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'space-between'
+                      justifyContent: 'space-between',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = '#0284c7';
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = '#e2e8f0';
+                      e.currentTarget.style.transform = 'translateY(0)';
                     }}
                   >
-                    <span>Diagnose drawdown & motor temp</span>
-                    <Zap size={14} color="#0284c7" />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#f0f9ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Zap size={14} color="#0284c7" />
+                      </div>
+                      <span>Diagnose drawdown & motor temp</span>
+                    </div>
+                    <ChevronRight size={14} color="#94a3b8" />
+                  </button>
+
+                  <button
+                    onClick={() => handleSendMessage('Check intake gas interference & BEP pump curve deviation.')}
+                    style={{
+                      padding: '12px 16px',
+                      background: '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '12px',
+                      color: '#0f172a',
+                      fontSize: '0.78rem',
+                      fontWeight: '600',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = '#0284c7';
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = '#e2e8f0';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#f0f9ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <TrendingUp size={14} color="#0284c7" />
+                      </div>
+                      <span>Check gas interference & BEP curve</span>
+                    </div>
+                    <ChevronRight size={14} color="#94a3b8" />
                   </button>
                 </div>
               </div>
@@ -748,14 +831,18 @@ export const AgentFloatingDock = () => {
                 {msg.sender === 'user' ? (
                   <div style={{
                     maxWidth: '88%',
-                    padding: '10px 14px',
-                    background: '#0284c7',
-                    borderRadius: '14px 14px 2px 14px',
+                    padding: '11px 16px',
+                    background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                    borderRadius: '16px 16px 2px 16px',
                     color: '#ffffff',
                     fontSize: '0.8rem',
-                    fontWeight: '500'
+                    fontWeight: '500',
+                    boxShadow: '0 3px 10px rgba(2, 132, 199, 0.2)'
                   }}>
                     {msg.text}
+                    <div style={{ fontSize: '0.65rem', color: 'rgba(255, 255, 255, 0.7)', textAlign: 'right', marginTop: '4px' }}>
+                      {msg.timestamp}
+                    </div>
                   </div>
                 ) : (
                   <div style={{ width: '100%', display: 'flex', gap: '10px' }}>
@@ -763,14 +850,15 @@ export const AgentFloatingDock = () => {
                       width: '32px',
                       height: '32px',
                       borderRadius: '10px',
-                      background: '#0284c7',
+                      background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       fontWeight: '800',
                       fontSize: '0.8rem',
                       color: '#ffffff',
-                      shrink: 0
+                      shrink: 0,
+                      boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)'
                     }}>
                       J
                     </div>
@@ -783,7 +871,7 @@ export const AgentFloatingDock = () => {
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '10px',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
                     }}>
                       {msg.status && (
                         <div style={{
@@ -810,7 +898,7 @@ export const AgentFloatingDock = () => {
 
                       {msg.actionCard && (
                         <div style={{
-                          padding: '12px',
+                          padding: '14px',
                           background: '#fffbe6',
                           border: '1px solid #ffe58f',
                           borderRadius: '10px',
@@ -819,14 +907,17 @@ export const AgentFloatingDock = () => {
                           gap: '6px'
                         }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <span style={{ fontSize: '0.72rem', fontWeight: '800', color: '#d46b08' }}>
-                              RECOMMENDED OPERATOR ACTION
-                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <ShieldAlert size={16} color="#d46b08" />
+                              <span style={{ fontSize: '0.72rem', fontWeight: '800', color: '#d46b08', letterSpacing: '0.02em' }}>
+                                RECOMMENDED OPERATOR ACTION
+                              </span>
+                            </div>
                             <span style={{ fontSize: '0.65rem', background: '#ffe58f', color: '#873800', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
                               HIGH PRIORITY (94%)
                             </span>
                           </div>
-                          <div style={{ fontSize: '0.78rem', color: '#262626', fontWeight: '600' }}>
+                          <div style={{ fontSize: '0.78rem', color: '#262626', fontWeight: '600', marginTop: '2px' }}>
                             {msg.actionCard.title}
                           </div>
                         </div>
@@ -843,10 +934,10 @@ export const AgentFloatingDock = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* ─── Bottom Input Composer ("Agent box query") ─── */}
+          {/* ─── SLEEK BOTTOM INPUT COMPOSER ("Agent box query") ─── */}
           <div style={{
-            padding: '14px 18px',
-            paddingLeft: '22px',
+            padding: '16px 20px',
+            paddingLeft: '24px',
             background: '#ffffff',
             borderTop: '1px solid #e2e8f0',
             display: 'flex',
@@ -869,24 +960,35 @@ export const AgentFloatingDock = () => {
                 color: '#0f172a',
                 fontSize: '0.8rem',
                 outline: 'none',
-                boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.03)'
+                boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)',
+                transition: 'all 0.15s ease'
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = '#0284c7';
+                e.currentTarget.style.backgroundColor = '#ffffff';
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = '#cbd5e1';
+                e.currentTarget.style.backgroundColor = '#f8fafc';
               }}
             />
             <button
               onClick={() => handleSendMessage()}
               disabled={isLoading || !inputQuery.trim()}
               style={{
-                padding: '11px 18px',
-                background: inputQuery.trim() ? '#0284c7' : '#cbd5e1',
+                padding: '11px 20px',
+                background: inputQuery.trim() ? 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)' : '#e2e8f0',
                 border: 'none',
                 borderRadius: '10px',
-                color: '#ffffff',
+                color: inputQuery.trim() ? '#ffffff' : '#94a3b8',
                 fontWeight: '700',
                 cursor: inputQuery.trim() ? 'pointer' : 'not-allowed',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                fontSize: '0.8rem'
+                fontSize: '0.8rem',
+                boxShadow: inputQuery.trim() ? '0 4px 12px rgba(2, 132, 199, 0.3)' : 'none',
+                transition: 'all 0.15s ease'
               }}
             >
               <span>Send</span>
