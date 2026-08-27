@@ -161,7 +161,7 @@ export const AgentFloatingDock = () => {
 
   return (
     <div style={{ zIndex: 9999, position: 'relative' }}>
-      {/* ─── Floating Launcher Notch Button ─── */}
+      {/* ─── Floating Launcher Notch Button (Using /Agent_launcer.png) ─── */}
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
@@ -169,58 +169,70 @@ export const AgentFloatingDock = () => {
             position: 'fixed',
             bottom: '24px',
             right: '24px',
-            height: '54px',
-            padding: '0 20px',
-            borderRadius: '27px',
-            background: 'linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%)',
-            border: '1.5px solid #0284c7',
-            boxShadow: '0 10px 30px rgba(2, 132, 199, 0.25), 0 4px 12px rgba(0, 0, 0, 0.08)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
+            background: 'transparent',
+            border: 'none',
+            padding: 0,
             cursor: 'pointer',
-            transition: 'all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-            outline: 'none'
+            outline: 'none',
+            zIndex: 9999,
+            transition: 'transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), filter 0.25s ease'
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px) scale(1.03)';
-            e.currentTarget.style.boxShadow = '0 14px 36px rgba(2, 132, 199, 0.35)';
+            e.currentTarget.style.transform = 'translateY(-2px) scale(1.05)';
+            e.currentTarget.style.filter = 'drop-shadow(0 12px 24px rgba(2, 132, 199, 0.4))';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.transform = 'translateY(0) scale(1.0)';
-            e.currentTarget.style.boxShadow = '0 10px 30px rgba(2, 132, 199, 0.25)';
+            e.currentTarget.style.filter = 'drop-shadow(0 8px 16px rgba(0, 0, 0, 0.25))';
           }}
-          title="Open ESP Agent Copilot"
+          title="Open Agent Jane APM Copilot"
         >
-          <div style={{
-            position: 'relative',
-            width: '32px',
-            height: '32px',
-            borderRadius: '10px',
-            background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-            <Bot size={20} color="#ffffff" strokeWidth={2.2} />
-            <span style={{
-              position: 'absolute',
-              top: '-2px',
-              right: '-2px',
-              width: '9px',
-              height: '9px',
-              borderRadius: '50%',
-              backgroundColor: '#10b981',
-              border: '2px solid #ffffff'
-            }} />
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-            <span style={{ fontSize: '0.85rem', fontWeight: '800', color: '#0f172a', letterSpacing: '0.02em', lineHeight: '1.2' }}>
-              Agent Jane
-            </span>
-            <span style={{ fontSize: '0.68rem', color: '#0284c7', fontWeight: '600' }}>
-              APM Copilot
-            </span>
+          <img
+            src="/Agent_launcer.png"
+            alt="Agent Jane APM Copilot"
+            style={{
+              height: '52px',
+              width: 'auto',
+              display: 'block',
+              borderRadius: '26px'
+            }}
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+              if (e.currentTarget.nextSibling) {
+                e.currentTarget.nextSibling.style.display = 'flex';
+              }
+            }}
+          />
+          <div
+            style={{
+              display: 'none',
+              height: '52px',
+              padding: '0 18px',
+              borderRadius: '26px',
+              background: '#ffffff',
+              border: '1.5px solid #0284c7',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+              alignItems: 'center',
+              gap: '10px'
+            }}
+          >
+            <div style={{
+              position: 'relative',
+              width: '32px',
+              height: '32px',
+              borderRadius: '10px',
+              background: '#0284c7',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <Bot size={20} color="#ffffff" />
+              <span style={{ position: 'absolute', top: '-2px', right: '-2px', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981', border: '2px solid #ffffff' }} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: '800', color: '#0f172a' }}>Agent Jane</span>
+              <span style={{ fontSize: '0.68rem', color: '#0284c7', fontWeight: '700' }}>APM Copilot</span>
+            </div>
           </div>
         </button>
       )}
