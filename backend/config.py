@@ -3,6 +3,12 @@ from pathlib import Path
 from pydantic import BaseModel
 from typing import List, Optional
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 # Base directories
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
@@ -12,12 +18,12 @@ UNLABELLED_DB_PATH = str(DATA_DIR / "unlabelled.db")
 DB_PATH = UNLABELLED_DB_PATH
 
 class MQTTConfig(BaseModel):
-    broker_host: str = os.getenv("MQTT_BROKER_HOST", "")
+    broker_host: str = os.getenv("MQTT_BROKER_HOST", "192.168.1.155")
     broker_port: int = int(os.getenv("MQTT_BROKER_PORT", "1883"))
     username: Optional[str] = os.getenv("MQTT_USERNAME", None)
     password: Optional[str] = os.getenv("MQTT_PASSWORD", None)
     client_id_prefix: str = "opg_collector_"
-    topics: List[str] = ["esp/#", "wells/#", "opg/#"]
+    topics: List[str] = ["esp/v1/+/telemetry", "esp/#", "wells/#", "opg/#"]
     keepalive: int = 60
     reconnect_delay_min: int = 1
     reconnect_delay_max: int = 30
