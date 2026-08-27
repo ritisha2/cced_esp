@@ -1,0 +1,1331 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OPG & ESP Wells Telemetry Ledger</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Chart.js for real-time time-series -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="/static/css/styles.css?v=2.1">
+</head>
+<body class="theme-dark">
+    <div class="app-container">
+        <!-- Top Navigation / Header -->
+        <header class="top-nav">
+            <div class="brand-section">
+                <div class="brand-logo">
+                    <i class="fa-solid fa-oil-well"></i>
+                </div>
+                <div class="brand-text">
+                    <div class="brand-title">OPG & ESP WELLS TELEMETRY</div>
+                    <div class="brand-subtitle">Asset-Categorized Time-Series MQTT Ingestion Platform (Labelled & Unlabelled Datasets)</div>
+                </div>
+            </div>
+
+            <!-- Header Status Badges & Theme Switcher -->
+            <div class="header-status-group">
+                <button id="btnThemeToggle" class="theme-toggle-btn" title="Toggle Light / Dark Theme">
+                    <i class="fa-solid fa-sun theme-icon"></i>
+                    <span class="theme-label">Light Mode</span>
+                </button>
+                <div id="mqttStatusBadge" class="status-pill status-disconnected" title="MQTT Broker Connection Status">
+                    <span class="status-dot"></span>
+                    <span class="status-text">MQTT: Disconnected</span>
+                </div>
+                <div id="pipelineStatusBadge" class="status-pill status-active" title="Ingestion Pipeline Status">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Ingestion: Running</span>
+                </div>
+                <div id="wsStatusBadge" class="status-pill status-connected" title="Live WebSocket Stream">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Stream: Live</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- KPI Metrics Grid -->
+        <section class="kpi-grid">
+            <div class="kpi-card clickable-kpi" id="kpiDbCard" title="Click to open Floating Storage & Collection Window">
+                <div class="kpi-icon icon-cyan"><i class="fa-solid fa-database"></i></div>
+                <div class="kpi-data">
+                    <div class="kpi-label">SQLite Ingested Records <i class="fa-solid fa-up-right-from-square hint-icon"></i></div>
+                    <div class="kpi-value" id="kpiTotalRecords">0</div>
+                </div>
+                <div class="kpi-inspect-badge"><i class="fa-solid fa-magnifying-glass-chart"></i> View Storage Breakdown</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-icon icon-emerald"><i class="fa-solid fa-bolt"></i></div>
+                <div class="kpi-data">
+                    <div class="kpi-label">Ingestion Rate</div>
+                    <div class="kpi-value" id="kpiIngestRate">0.0 <span class="kpi-unit">msg/s</span></div>
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-icon icon-purple"><i class="fa-solid fa-layer-group"></i></div>
+                <div class="kpi-data">
+                    <div class="kpi-label">Active Wells & Fleets</div>
+                    <div class="kpi-value" id="kpiTotalAssets">0</div>
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-icon icon-amber"><i class="fa-solid fa-tags"></i></div>
+                <div class="kpi-data">
+                    <div class="kpi-label">Dataset Categories</div>
+                    <div class="kpi-value" id="kpiCategoriesSummary">Labelled / Unlabelled</div>
+                </div>
+            </div>
+            <div class="kpi-card" id="kpiBufferCard">
+                <div class="kpi-icon icon-rose"><i class="fa-solid fa-pause"></i></div>
+                <div class="kpi-data">
+                    <div class="kpi-label">Pause Buffer</div>
+                    <div class="kpi-value" id="kpiBufferCount">0</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Workspace Tabs -->
+        <div class="main-tabs-bar">
+            <div class="tabs-group">
+                <button class="tab-btn active" data-tab="tab-ledger">
+                    <i class="fa-solid fa-table-list"></i> Live Telemetry Ledger & Pipeline Controls
+                </button>
+                <button class="tab-btn" data-tab="tab-esp">
+                    <i class="fa-solid fa-brain"></i> ESP Intelligence
+                </button>
+                <button class="tab-btn" data-tab="tab-13-params">
+                    <i class="fa-solid fa-chart-area"></i> Live 13-Parameter Graphs
+                </button>
+                <button class="tab-btn" data-tab="tab-esp-replay">
+                    <i class="fa-solid fa-clock-rotate-left"></i> Scenario Replay
+                </button>
+                <button class="tab-btn" data-tab="tab-esp-perf">
+                    <i class="fa-solid fa-chart-pie"></i> Model Performance
+                </button>
+                <button class="tab-btn" data-tab="tab-esp-readiness">
+                    <i class="fa-solid fa-clipboard-check"></i> Site Data Readiness
+                </button>
+                <button class="tab-btn" data-tab="tab-analytics">
+                    <i class="fa-solid fa-chart-line"></i> Time-Series Trends
+                </button>
+                <button class="tab-btn" data-tab="tab-fleet">
+                    <i class="fa-solid fa-sitemap"></i> Well Fleet Summary
+                </button>
+            </div>
+
+
+            <!-- Export and Table Options -->
+            <div class="tab-side-actions">
+                <button id="btnExportLabelledCSV" class="btn btn-small btn-secondary" title="Export Labelled Dataset (with Scenarios & Alarms) to CSV">
+                    <i class="fa-solid fa-tags"></i> Export Labelled CSV
+                </button>
+                <button id="btnExportUnlabelledCSV" class="btn btn-small btn-secondary" title="Export Unlabelled Dataset (Pure Parameters) to CSV">
+                    <i class="fa-solid fa-file-csv"></i> Export Unlabelled CSV
+                </button>
+                <button id="btnClearDB" class="btn btn-small btn-danger" title="Clear all stored time-series records">
+                    <i class="fa-solid fa-trash"></i> Clear Database
+                </button>
+            </div>
+        </div>
+
+        <!-- TAB 1: Live Ledger & Pipeline Controls -->
+        <main id="tab-ledger" class="tab-content active">
+            <!-- CONSOLE PANEL: Unified Compact MQTT Broker + Pipeline Ingestion Controls -->
+            <div class="console-panel compact-unified-console">
+                <div class="console-section unified-section">
+                    <!-- Compact Top Header with Title, Live Status & Quick Action Buttons -->
+                    <div class="unified-header">
+                        <div class="unified-header-left">
+                            <div class="section-title">
+                                <i class="fa-solid fa-network-wired"></i> MQTT Broker & Ingestion Pipeline Controls
+                            </div>
+                            <span class="broker-status-indicator" id="brokerStatusIndicator">
+                                <span class="status-dot"></span> <span id="brokerStatusBannerText">Disconnected</span>
+                            </span>
+                        </div>
+                        <div class="unified-header-right">
+                            <button id="btnPlay" class="btn btn-success btn-small" title="Start / Resume Ingestion">
+                                <i class="fa-solid fa-play"></i> Play
+                            </button>
+                            <button id="btnPause" class="btn btn-warning btn-small" title="Pause Data Ingestion">
+                                <i class="fa-solid fa-pause"></i> Pause
+                            </button>
+                            <div class="toggle-pill-wrapper compact-toggle" title="Buffer incoming messages during pause">
+                                <label class="toggle-label" for="chkBufferOnPause">Buffer</label>
+                                <input type="checkbox" id="chkBufferOnPause" checked>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Compact 2-Row Form Grid -->
+                    <div class="unified-body-grid">
+                        <!-- Row 1: MQTT Broker Connection Settings -->
+                        <div class="unified-row">
+                            <div class="unified-field" style="flex: 1.5;">
+                                <label for="inlineBrokerHost"><i class="fa-solid fa-server"></i> Host / IP</label>
+                                <input type="text" id="inlineBrokerHost" class="form-input-sm" placeholder="e.g. localhost, 127.0.0.1" required>
+                            </div>
+                            <div class="unified-field" style="max-width: 80px;">
+                                <label for="inlineBrokerPort">Port</label>
+                                <input type="number" id="inlineBrokerPort" class="form-input-sm" placeholder="1883" value="1883" required>
+                            </div>
+                            <div class="unified-field" style="flex: 1;">
+                                <label for="inlineUsername"><i class="fa-solid fa-user"></i> User</label>
+                                <input type="text" id="inlineUsername" class="form-input-sm" placeholder="Optional">
+                            </div>
+                            <div class="unified-field" style="flex: 1;">
+                                <label for="inlinePassword"><i class="fa-solid fa-key"></i> Pass</label>
+                                <input type="password" id="inlinePassword" class="form-input-sm" placeholder="Optional">
+                            </div>
+                            <div class="unified-field" style="flex: 1.8;">
+                                <label for="inlineTopics"><i class="fa-solid fa-hashtag"></i> Topics</label>
+                                <input type="text" id="inlineTopics" class="form-input-sm" placeholder="esp/#, opg/#" value="esp/#, opg/#, wells/#">
+                            </div>
+                            <div class="unified-field-actions">
+                                <button type="button" id="btnConnectBroker" class="btn btn-primary btn-small">
+                                    <i class="fa-solid fa-plug"></i> Connect
+                                </button>
+                                <button type="button" id="btnDisconnectBroker" class="btn btn-secondary btn-small" title="Disconnect">
+                                    <i class="fa-solid fa-power-off"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Row 2: Ingestion Filter Controls -->
+                        <div class="unified-row">
+                            <div class="unified-field" style="flex: 1.2;">
+                                <label for="selStorageCategoryMode"><i class="fa-solid fa-layer-group"></i> Storage Mode</label>
+                                <select id="selStorageCategoryMode" class="form-select-sm">
+                                    <option value="BOTH" selected>Both (Labelled + Unlabelled)</option>
+                                    <option value="LABELLED_ONLY">Labelled Only (with Faults)</option>
+                                    <option value="UNLABELLED_ONLY">Unlabelled Only (Pure Telemetry)</option>
+                                </select>
+                            </div>
+                            <div class="unified-field" style="flex: 1.5;">
+                                <label for="selIngestScenario"><i class="fa-solid fa-triangle-exclamation"></i> Ingest Fault</label>
+                                <select id="selIngestScenario" class="form-select-sm">
+                                    <option value="ALL">All Faults & States</option>
+                                    <option value="ANOMALIES_ONLY">⚠️ Anomalies / Faults Only</option>
+                                    <option value="normal">🟢 Normal</option>
+                                    <option value="dry_well_pump_off">🏜️ Dry-Well Pump Off</option>
+                                    <option value="blocked_intake">🚫 Blocked Intake</option>
+                                    <option value="scale_or_pump_wear">⚙️ Scale or Pump Wear</option>
+                                    <option value="sand_ingestion">🏖️ Sand Ingestion</option>
+                                    <option value="bearing_degradation">🔧 Bearing Degradation</option>
+                                    <option value="high_viscosity_cold_start">❄️ High Viscosity Cold Start</option>
+                                    <option value="high_backpressure">📈 High Backpressure</option>
+                                    <option value="open_choke">🎛️ Open Choke</option>
+                                    <option value="undervoltage">⚡ Undervoltage</option>
+                                    <option value="phase_imbalance">🔌 Phase Imbalance</option>
+                                    <option value="motor_overload">🔥 Motor Overload</option>
+                                    <option value="power_loss">🌑 Power Loss</option>
+                                    <option value="sensor_drift">📡 Sensor Drift</option>
+                                    <option value="gas_interference_to_lock">🟡 Gas Interference / Lock</option>
+                                </select>
+                            </div>
+                            <div class="unified-field" style="flex: 1;">
+                                <label for="selIngestState"><i class="fa-solid fa-power-off"></i> State</label>
+                                <select id="selIngestState" class="form-select-sm">
+                                    <option value="ALL">All States</option>
+                                    <option value="running">🟢 Running Only</option>
+                                    <option value="tripped">🔴 Tripped Only</option>
+                                </select>
+                            </div>
+                            <div class="unified-field" style="flex: 1.2;">
+                                <label for="selIngestPumpFamily"><i class="fa-solid fa-industry"></i> Pump Family</label>
+                                <select id="selIngestPumpFamily" class="form-select-sm">
+                                    <option value="ALL">All Families</option>
+                                    <option value="B400">B400 Series</option>
+                                    <option value="TD650">TD650 Series</option>
+                                    <option value="PMSND">400PMSND</option>
+                                    <option value="FlexER">400FlexER</option>
+                                </select>
+                            </div>
+                            <div class="unified-field" style="flex: 1;">
+                                <label for="selFilterMode"><i class="fa-solid fa-list-check"></i> Filter Mode</label>
+                                <select id="selFilterMode" class="form-select-sm">
+                                    <option value="ALL">Collect All</option>
+                                    <option value="WHITELIST">Whitelist</option>
+                                    <option value="BLACKLIST">Blacklist</option>
+                                </select>
+                            </div>
+                            <div class="unified-field-actions">
+                                <button id="btnApplyFilters" class="btn btn-primary btn-small">
+                                    <i class="fa-solid fa-check"></i> Apply Settings
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ledger Table Filter & Search Toolbar (Multi-Filter Types) -->
+            <div class="ledger-toolbar">
+                <div class="ledger-search-box">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="txtLedgerSearch" placeholder="Search Well, Fault, Trip Cause, Topic...">
+                </div>
+
+                <div class="ledger-view-filters">
+                    <!-- Filter Type 1: Category -->
+                    <div class="view-filter-item">
+                        <label><i class="fa-solid fa-tags"></i> Category:</label>
+                        <select id="selViewCategory" class="form-select-sm">
+                            <option value="ALL">All Categories</option>
+                            <option value="LABELLED">🏷️ Labelled</option>
+                            <option value="UNLABELLED">📊 Unlabelled</option>
+                        </select>
+                    </div>
+
+                    <!-- Filter Type 2: Fault Type -->
+                    <div class="view-filter-item">
+                        <label><i class="fa-solid fa-triangle-exclamation"></i> Fault:</label>
+                        <select id="selViewScenario" class="form-select-sm">
+                            <option value="ALL">All Faults</option>
+                            <option value="ANOMALIES_ONLY">⚠️ Anomalies / Faults Only</option>
+                            <option value="normal">🟢 Normal</option>
+                            <option value="dry_well_pump_off">🏜️ Dry-Well Pump Off</option>
+                            <option value="blocked_intake">🚫 Blocked Intake</option>
+                            <option value="scale_or_pump_wear">⚙️ Scale / Pump Wear</option>
+                            <option value="sand_ingestion">🏖️ Sand Ingestion</option>
+                            <option value="bearing_degradation">🔧 Bearing Degradation</option>
+                            <option value="high_viscosity_cold_start">❄️ Cold Start</option>
+                            <option value="high_backpressure">📈 High Backpressure</option>
+                            <option value="open_choke">🎛️ Open Choke</option>
+                            <option value="undervoltage">⚡ Undervoltage</option>
+                            <option value="phase_imbalance">🔌 Phase Imbal</option>
+                            <option value="motor_overload">🔥 Motor Overload</option>
+                            <option value="power_loss">🌑 Power Loss</option>
+                            <option value="sensor_drift">📡 Sensor Drift</option>
+                            <option value="gas_interference_to_lock">🟡 Gas Lock</option>
+                        </select>
+                    </div>
+
+                    <!-- Filter Type 3: State & Trip -->
+                    <div class="view-filter-item">
+                        <label><i class="fa-solid fa-power-off"></i> State & Trip:</label>
+                        <select id="selViewTrip" class="form-select-sm">
+                            <option value="ALL">All States</option>
+                            <option value="RUNNING_ONLY">🟢 Running Only</option>
+                            <option value="TRIPPED_ANY">🔴 Tripped (Any)</option>
+                            <option value="GAS_LOCK_UNDERLOAD">⚠️ Gas Lock Trip</option>
+                            <option value="UNDER_VOLTAGE">⚠️ Under-Voltage Trip</option>
+                            <option value="HIGH_VIBRATION">⚠️ High Vibration Trip</option>
+                            <option value="OVERLOAD_SOLIDS">⚠️ Overload Solids Trip</option>
+                            <option value="MOTOR_OVERLOAD">⚠️ Motor Overload Trip</option>
+                            <option value="BROKEN_SHAFT_UNDERLOAD">⚠️ Broken Shaft Trip</option>
+                            <option value="PHASE_IMBALANCE">⚠️ Phase Imbalance Trip</option>
+                            <option value="UNDERLOAD_PUMP_OFF">⚠️ Pump-Off Trip</option>
+                        </select>
+                    </div>
+
+                    <!-- Filter Type 4: Alarms -->
+                    <div class="view-filter-item">
+                        <label><i class="fa-solid fa-bell"></i> Alarms:</label>
+                        <select id="selViewAlarm" class="form-select-sm">
+                            <option value="ALL">All Alarm States</option>
+                            <option value="WITH_ALARMS">🚨 Active Alarms Only</option>
+                            <option value="NO_ALARMS">✅ Clean / No Alarms</option>
+                            <option value="OUTSIDE_RECOMMENDED_OPERATING_RANGE">⚠️ Outside Envelope</option>
+                            <option value="LOW_INTAKE_PRESSURE">⚠️ Low Intake Pressure</option>
+                            <option value="MOTOR_POWER_CAPACITY">⚠️ Motor Capacity Limit</option>
+                            <option value="UNDERLOAD">⚠️ Underload Alarm</option>
+                        </select>
+                    </div>
+
+                    <!-- Filter Type 5: Pump Family -->
+                    <div class="view-filter-item">
+                        <label><i class="fa-solid fa-industry"></i> Pump:</label>
+                        <select id="selViewPumpFamily" class="form-select-sm">
+                            <option value="ALL">All Families</option>
+                            <option value="B400">B400 Series</option>
+                            <option value="TD650">TD650 Series</option>
+                            <option value="PMSND">400PMSND</option>
+                            <option value="FlexER">400FlexER</option>
+                        </select>
+                    </div>
+
+                    <!-- Filter Type 6: Well ID -->
+                    <div class="view-filter-item">
+                        <label><i class="fa-solid fa-building"></i> Well:</label>
+                        <select id="selViewAsset" class="form-select-sm">
+                            <option value="ALL">All Wells</option>
+                        </select>
+                    </div>
+
+                    <div class="ledger-autoscroll-toggle">
+                        <input type="checkbox" id="chkAutoScroll" checked>
+                        <label for="chkAutoScroll"><i class="fa-solid fa-arrow-down"></i> Lock</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ledger Table Container -->
+            <div class="table-container">
+                <table class="ledger-table" id="telemetryTable">
+                    <thead>
+                        <tr>
+                            <th style="min-width: 60px;">ID</th>
+                            <th style="min-width: 140px;">Time (UTC)</th>
+                            <th style="min-width: 95px;">Category</th>
+                            <th style="min-width: 85px;">Well</th>
+                            <th style="min-width: 160px;">Asset / Pump</th>
+                            <th style="min-width: 160px;">Fault / Alarms</th>
+                            <th style="min-width: 105px;">Discharge P</th>
+                            <th style="min-width: 95px;">Intake P</th>
+                            <th style="min-width: 100px;">Flow (BPD)</th>
+                            <th style="min-width: 90px;">Freq (Hz)</th>
+                            <th style="min-width: 95px;">Current (A)</th>
+                            <th style="min-width: 90px;">Temp (°C)</th>
+                            <th style="min-width: 130px;">State / Trip</th>
+                            <th style="min-width: 55px; text-align: center;">Raw</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ledgerTableBody">
+                        <tr class="empty-state-row">
+                            <td colspan="14">
+                                <div class="empty-state">
+                                    <i class="fa-solid fa-inbox fa-2x"></i>
+                                    <p>Connect your MQTT Broker to start collecting live well data...</p>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="table-footer">
+                <div class="footer-info" id="tableStatsInfo">Showing latest live records</div>
+                <div class="pagination-controls">
+                    <button id="btnLoadMore" class="btn btn-small btn-secondary"><i class="fa-solid fa-clock-rotate-left"></i> Load Historical Records</button>
+                </div>
+            </div>
+        </main>
+
+        <!-- TAB 2: Time-Series Trends & Visualizations -->
+        <main id="tab-analytics" class="tab-content">
+            <div class="analytics-toolbar">
+                <div class="analytics-filter-group">
+                    <label for="selChartAsset">Select Well / Asset for Analysis:</label>
+                    <select id="selChartAsset" class="form-select">
+                        <option value="ALL">All Active Wells Combined</option>
+                    </select>
+                </div>
+                <div class="analytics-filter-group">
+                    <label for="selChartPoints">Chart Range:</label>
+                    <select id="selChartPoints" class="form-select">
+                        <option value="30">Last 30 data points</option>
+                        <option value="60" selected>Last 60 data points</option>
+                        <option value="120">Last 120 data points</option>
+                        <option value="300">Last 300 data points</option>
+                    </select>
+                </div>
+                <button id="btnRefreshCharts" class="btn btn-secondary"><i class="fa-solid fa-rotate"></i> Refresh Charts</button>
+            </div>
+
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div class="chart-title"><i class="fa-solid fa-gauge-high"></i> Discharge & Intake Pressure (PSI) Trends</div>
+                    </div>
+                    <div class="chart-body">
+                        <canvas id="pressureTempChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div class="chart-title"><i class="fa-solid fa-bolt"></i> Flow Rate (BPD) & Motor Frequency (Hz)</div>
+                    </div>
+                    <div class="chart-body">
+                        <canvas id="productionFlowChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- TAB 3: Asset Fleet Summary -->
+        <main id="tab-fleet" class="tab-content">
+            <div class="fleet-header">
+                <div class="section-title"><i class="fa-solid fa-sitemap"></i> Discovered Well Fleets & ESP Health</div>
+                <button id="btnRefreshFleet" class="btn btn-secondary btn-small"><i class="fa-solid fa-rotate"></i> Refresh Summary</button>
+            </div>
+            <div class="fleet-grid" id="fleetGridContainer">
+                <div class="empty-state">
+                    <i class="fa-solid fa-layer-group fa-2x"></i>
+                    <p>No Well Fleet records found yet. Connect your broker and start collecting telemetry.</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- TAB 4: ESP Intelligence Platform -->
+        <main id="tab-esp" class="tab-content">
+            <!-- Top Controls Bar -->
+            <div class="esp-top-bar">
+                <div class="esp-bar-left">
+                    <div class="control-group">
+                        <label for="selESPWellFilter"><i class="fa-solid fa-filter"></i> Select Active Asset / Well:</label>
+                        <select id="selESPWellFilter" class="form-select">
+                            <option value="">Loading Real Assets...</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="esp-bar-right">
+                    <span id="espLiveConnectionState" class="pulse-tag pulse-live"><i class="fa-solid fa-circle"></i> LIVE</span>
+                    <span id="espTelemetryTimestamp" class="meta-tag"><i class="fa-solid fa-clock"></i> —</span>
+                    <span id="espTraceIdBadge" class="meta-tag"><i class="fa-solid fa-fingerprint"></i> TRC-—</span>
+                    <span id="espDataQualityPill" class="meta-tag"><i class="fa-solid fa-shield-halved"></i> Data: GOOD</span>
+                    <button id="btnESPManualRefresh" class="btn btn-secondary btn-small"><i class="fa-solid fa-rotate"></i> Refresh Asset Data</button>
+                </div>
+            </div>
+
+            <!-- 1. UNIFIED HEALTH MASTER BANNER -->
+            <div class="esp-master-banner">
+                <div class="banner-status-col">
+                    <div id="espMasterStatusBadge" class="esp-master-badge esp-badge-healthy">
+                        <i class="fa-solid fa-circle-check"></i>
+                        <span id="espMasterStatusText">HEALTHY</span>
+                    </div>
+                </div>
+                <div class="banner-diagnosis-col">
+                    <div class="diag-primary-row">
+                        <div class="diag-title-group">
+                            <span class="diag-label">Active State / Diagnosis:</span>
+                            <span id="espActiveFaultName" class="diag-fault-name">Healthy Operation</span>
+                        </div>
+                        <span id="espActiveFaultConfidence" class="confidence-pill conf-high">—</span>
+                    </div>
+                    <div class="diag-pills-row">
+                        <span id="espFutureRiskBadge" class="risk-pill risk-low"><i class="fa-solid fa-triangle-exclamation"></i> Future Risk: RESEARCH / REPLAY ONLY</span>
+                        <span id="espRulBadge" class="rul-pill rul-unavailable"><i class="fa-solid fa-hourglass-half"></i> RUL unavailable — insufficient run-to-failure history</span>
+                        <span id="espAnomalyScorePill" class="anomaly-pill anom-normal"><i class="fa-solid fa-wave-square"></i> Anomaly Score: —</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. ROLE-BASED VIEW SWITCHER -->
+            <div class="role-view-bar">
+                <div class="role-view-title"><i class="fa-solid fa-user-gear"></i> Engineering Perspective:</div>
+                <div class="role-btn-group">
+                    <button class="role-view-btn active" data-role="operator"><i class="fa-solid fa-user-astronaut"></i> Operator View</button>
+                    <button class="role-view-btn" data-role="schematic"><i class="fa-solid fa-diagram-project"></i> ESP System Schematic</button>
+                    <button class="role-view-btn" data-role="evidence"><i class="fa-solid fa-chart-line"></i> Supporting Evidence</button>
+                    <button class="role-view-btn" data-role="manager"><i class="fa-solid fa-chart-pie"></i> Manager View</button>
+                    <button class="role-view-btn" data-role="engineer"><i class="fa-solid fa-microchip"></i> Engineer View</button>
+                    <button class="role-view-btn" data-role="learning"><i class="fa-solid fa-graduation-cap"></i> Learning Center</button>
+                </div>
+            </div>
+
+            <!-- ROLE CONTAINER 1: OPERATOR VIEW -->
+            <div id="espOperatorView" class="role-view-panel">
+                <div class="operator-advisory-card">
+                    <div class="advisory-header"><i class="fa-solid fa-lightbulb"></i> Recommended Operator Action</div>
+                    <div class="advisory-action-box" id="espOperatorActionText">Continue standard operational monitoring.</div>
+                    <div class="advisory-why-section">
+                        <div class="why-title">Operating Evidence & Root Cause:</div>
+                        <ul class="why-list" id="espOperatorWhyList">
+                            <li><i class="fa-solid fa-check"></i> Monitored physical parameters remain within reference safety limits.</li>
+                        </ul>
+                    </div>
+
+                    <!-- Operator Field Feedback Action Bar -->
+                    <div class="field-feedback-box" style="margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.08);">
+                        <div style="font-size: 12px; font-weight: 700; color: #38bdf8; margin-bottom: 8px;">
+                            <i class="fa-solid fa-clipboard-check"></i> Log Field Ground Truth Feedback for Current Diagnosis:
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                            <button id="btnFeedbackConfirm" class="btn btn-small btn-success" style="padding: 4px 10px; font-size: 11px;">
+                                <i class="fa-solid fa-check"></i> Confirm Real Fault
+                            </button>
+                            <button id="btnFeedbackFalseAlarm" class="btn btn-small btn-danger" style="padding: 4px 10px; font-size: 11px;">
+                                <i class="fa-solid fa-xmark"></i> Flag False Alarm
+                            </button>
+                            <button id="btnFeedbackUnknown" class="btn btn-small btn-secondary" style="padding: 4px 10px; font-size: 11px;">
+                                <i class="fa-solid fa-question"></i> Unverified / Unknown
+                            </button>
+                            <input type="text" id="txtOperatorFeedbackNote" placeholder="Optional maintenance/operator note..." style="flex: 1; min-width: 180px; padding: 4px 8px; font-size: 11px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; color: #fff;">
+                            <span id="feedbackSubmitStatus" style="font-size: 11px; color: #10b981; display: none;">Saved!</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ROLE CONTAINER: ESP SYSTEM SCHEMATIC VIEW -->
+            <div id="espSchematicView" class="role-view-panel" style="display: none;">
+                <div class="schematic-container-card">
+                    <div class="schematic-card-header">
+                        <div>
+                            <div class="schematic-title"><i class="fa-solid fa-diagram-project"></i> ESP SYSTEM VISUALIZATION — <span id="schematicAssetLabel">—</span></div>
+                            <div class="schematic-subtitle">Live telemetry-linked downhole string — click or hover any sensor marker for live reading, provenance & trace.</div>
+                        </div>
+                        <div class="schematic-header-badges">
+                            <span class="meta-tag" id="schematicPumpModelBadge">Pump: —</span>
+                            <span class="meta-tag" id="schematicStagesBadge">Stages: —</span>
+                            <span class="meta-tag" id="schematicMotorHpBadge">Motor: — HP</span>
+                        </div>
+                    </div>
+
+                    <div class="schematic-layout-grid">
+                        <!-- Left: Vertical Downhole Schematic Column -->
+                        <div class="schematic-visual-col">
+                            <div class="esp-string-wrapper">
+                                <!-- Surface Node -->
+                                <div class="esp-node surface-node">
+                                    <div class="surface-box vsd-box" id="nodeVsd">
+                                        <div class="vsd-title">VSD</div>
+                                        <div class="vsd-freq" id="schematicVsdFreq">— Hz</div>
+                                        <div class="marker-dot marker-pulse" data-marker="frequency_hz" title="VFD Operating Frequency"></div>
+                                    </div>
+                                    <div class="surface-box tx-box">TX</div>
+                                    <div class="surface-flow-line">
+                                        <span class="flow-arrow">→</span> Choke + Flow Meter
+                                        <div class="marker-dot" data-marker="flowline_pressure_psi" title="Flowline Pressure"></div>
+                                    </div>
+                                </div>
+
+                                <!-- Wellbore Well Head -->
+                                <div class="wellbore-container">
+                                    <div class="well-casing-left"></div>
+                                    <div class="well-casing-right"></div>
+                                    <div class="power-cable-trace"></div>
+
+                                    <!-- Section 1: Tubing -->
+                                    <div class="esp-node tubing-node">
+                                        <div class="tubing-label">Production Tubing</div>
+                                        <div class="tubing-dots">
+                                            <span>•</span><span>•</span><span>•</span>
+                                            <div class="marker-dot marker-orange" data-marker="wellhead_pressure_psi" title="Wellhead Tubing Pressure"></div>
+                                            <span>•</span><span>•</span><span>•</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Section 2: Pump Discharge -->
+                                    <div class="esp-node discharge-node">
+                                        <div class="node-block discharge-block">
+                                            <span class="block-title">Pump Discharge</span>
+                                            <span class="block-val" id="schematicDischargeVal">— PSI</span>
+                                            <div class="marker-dot marker-green" data-marker="discharge_pressure_psi" title="Pump Discharge Pressure (PDP)"></div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Section 3: Multistage Pump -->
+                                    <div class="esp-node pump-node">
+                                        <div class="node-block multistage-pump-block">
+                                            <div class="pump-vanes">
+                                                <div class="vane-line"></div>
+                                                <div class="vane-line"></div>
+                                                <div class="vane-line"></div>
+                                                <div class="vane-line"></div>
+                                            </div>
+                                            <div class="pump-specs-text">
+                                                <div class="p-model" id="schematicPumpModelText">Multistage Pump</div>
+                                                <div class="p-diff" id="schematicDiffPressureText">ΔP: — PSI</div>
+                                            </div>
+                                            <div class="marker-dot marker-red" data-marker="differential_pressure_psi" title="Differential Pressure (PDP - PIP)"></div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Section 4: Gas Handler & Intake -->
+                                    <div class="esp-node intake-node">
+                                        <div class="node-block intake-block">
+                                            <span class="block-title">Gas Handler · Intake</span>
+                                            <span class="block-val" id="schematicIntakeVal">PIP: — PSI</span>
+                                            <div class="marker-dot marker-yellow" data-marker="intake_pressure_psi" title="Pump Intake Pressure (PIP)"></div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Section 5: Protector / Seal -->
+                                    <div class="esp-node protector-node">
+                                        <div class="node-block protector-block">
+                                            <span class="block-title">Protector / Seal Section</span>
+                                            <span class="block-sub" id="schematicProtectorStatus">Seal: Intact</span>
+                                            <div class="marker-dot marker-blue" data-marker="protector" title="Protector & Seal Integrity"></div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Section 6: Submersible Motor -->
+                                    <div class="esp-node motor-node">
+                                        <div class="node-block motor-block">
+                                            <span class="block-title">Submersible Motor</span>
+                                            <div class="motor-readings" id="schematicMotorReadings">— A · — °C</div>
+                                            <div class="marker-dot marker-cyan" data-marker="motor_current_a" title="Motor Current & Temperature"></div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Section 7: Downhole Sensor & Perforations -->
+                                    <div class="esp-node sensor-node">
+                                        <div class="downhole-sensor-badge">
+                                            <i class="fa-solid fa-satellite-dish"></i> <span id="schematicSensorStatus">Downhole Sensor — GOOD</span>
+                                            <div class="marker-dot marker-emerald" data-marker="downhole_sensor" title="Downhole Gauge Telemetry"></div>
+                                        </div>
+                                        <div class="perforations-inflow-box">
+                                            <div class="perf-title"><i class="fa-solid fa-arrow-down-up-across-line"></i> Perforations / Inflow</div>
+                                            <div class="perf-data" id="schematicPerforationsText">Flow: — BPD</div>
+                                            <div class="marker-dot marker-purple" data-marker="liquid_rate_bpd" title="Surface Liquid Rate"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right: Interactive Sensor Detail & Live Health Readout -->
+                        <div class="schematic-detail-col">
+                            <!-- Dynamic Hover Marker Detail Inspector -->
+                            <div class="marker-inspector-card" id="markerInspectorCard">
+                                <div class="inspector-header">
+                                    <span class="inspector-tag" id="inspectMarkerTag">LIVE SENSOR TELEMETRY</span>
+                                    <span class="inspector-quality" id="inspectMarkerQuality">Quality: GOOD</span>
+                                </div>
+                                <div class="inspector-param-name" id="inspectParamName">Select or hover a marker on the string</div>
+                                <div class="inspector-val-row">
+                                    <span class="inspector-val" id="inspectParamVal">—</span>
+                                    <span class="inspector-unit" id="inspectParamUnit"></span>
+                                    <span class="inspector-status-badge" id="inspectParamStatus">NORMAL</span>
+                                </div>
+                                <div class="inspector-meta-grid">
+                                    <div class="meta-item">
+                                        <div class="meta-lbl">Timestamp (UTC)</div>
+                                        <div class="meta-val" id="inspectParamTime">—</div>
+                                    </div>
+                                    <div class="meta-item">
+                                        <div class="meta-lbl">Data Source</div>
+                                        <div class="meta-val" id="inspectParamSource">SQLITE_HISTORIAN</div>
+                                    </div>
+                                    <div class="meta-item">
+                                        <div class="meta-lbl">Trace ID</div>
+                                        <div class="meta-val monospace" id="inspectParamTrace">—</div>
+                                    </div>
+                                    <div class="meta-item">
+                                        <div class="meta-lbl">Reference Range</div>
+                                        <div class="meta-val" id="inspectParamRange">Within Envelope</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Live Health Telemetry Breakdown Grid -->
+                            <div class="live-health-summary-grid">
+                                <div class="health-block electrical">
+                                    <div class="hb-title"><i class="fa-solid fa-bolt"></i> Electrical Health</div>
+                                    <div class="hb-item"><span>Current:</span> <strong id="hbCurrent">— A</strong></div>
+                                    <div class="hb-item"><span>Voltage:</span> <strong id="hbVoltage">— V</strong></div>
+                                    <div class="hb-item"><span>Frequency:</span> <strong id="hbFrequency">— Hz</strong></div>
+                                    <div class="hb-item"><span>Motor Load:</span> <strong id="hbLoad">— %</strong></div>
+                                </div>
+                                <div class="health-block hydraulic">
+                                    <div class="hb-title"><i class="fa-solid fa-droplet"></i> Hydraulic Health</div>
+                                    <div class="hb-item"><span>Intake P (PIP):</span> <strong id="hbPip">— PSI</strong></div>
+                                    <div class="hb-item"><span>Discharge P (PDP):</span> <strong id="hbPdp">— PSI</strong></div>
+                                    <div class="hb-item"><span>Diff Pressure:</span> <strong id="hbDiffP">— PSI</strong></div>
+                                    <div class="hb-item"><span>Liquid Rate:</span> <strong id="hbFlow">— BPD</strong></div>
+                                </div>
+                                <div class="health-block thermal">
+                                    <div class="hb-title"><i class="fa-solid fa-temperature-three-quarters"></i> Thermal & Mechanical</div>
+                                    <div class="hb-item"><span>Motor Temp:</span> <strong id="hbMotorTemp">— °C</strong></div>
+                                    <div class="hb-item"><span>Intake Temp:</span> <strong id="hbIntakeTemp">— °C</strong></div>
+                                    <div class="hb-item"><span>Vibration RMS:</span> <strong id="hbVibration">— g</strong></div>
+                                    <div class="hb-item"><span>Water Cut:</span> <strong id="hbWaterCut">— %</strong></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ROLE CONTAINER: SUPPORTING EVIDENCE DUAL-TIMELINE VIEW -->
+            <div id="espEvidenceView" class="role-view-panel" style="display: none;">
+                <div class="evidence-container-card">
+                    <div class="evidence-header-row">
+                        <div>
+                            <div class="evidence-title"><i class="fa-solid fa-chart-line"></i> SUPPORTING EVIDENCE — <span id="evidenceAssetLabel">—</span></div>
+                            <div class="evidence-subtitle">Multi-parameter time-series window with real recorded event bands and signature onset.</div>
+                        </div>
+                        <div class="evidence-controls">
+                            <div class="btn-group-sm">
+                                <button class="btn btn-secondary btn-small ev-range-btn" data-range="1h">1h</button>
+                                <button class="btn btn-secondary btn-small ev-range-btn active" data-range="6h">6h</button>
+                                <button class="btn btn-secondary btn-small ev-range-btn" data-range="24h">24h</button>
+                                <button class="btn btn-secondary btn-small ev-range-btn" data-range="7d">7d</button>
+                                <button class="btn btn-secondary btn-small ev-range-btn" data-range="all">All</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dual Chart Canvas Layout -->
+                    <div class="evidence-charts-grid">
+                        <!-- Left Chart: Current vs Liquid Rate -->
+                        <div class="evidence-chart-card">
+                            <div class="ev-chart-title">Motor Current (A) & Liquid Rate (BPD)</div>
+                            <div class="chart-canvas-wrapper">
+                                <canvas id="evidenceLeftChart"></canvas>
+                            </div>
+                        </div>
+                        <!-- Right Chart: Intake Pressure vs Discharge Pressure -->
+                        <div class="evidence-chart-card">
+                            <div class="ev-chart-title">Pump Intake Pressure (PSI) & Discharge Pressure (PSI)</div>
+                            <div class="chart-canvas-wrapper">
+                                <canvas id="evidenceRightChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Real Recorded Event Bands & State Transitions -->
+                    <div class="evidence-events-row">
+                        <div class="ev-events-title"><i class="fa-solid fa-flag"></i> Recorded Event Bands & Signatures:</div>
+                        <div class="ev-events-list" id="evidenceEventsList">
+                            <span class="ev-event-pill event-normal"><i class="fa-solid fa-circle-check"></i> Continuous Operation within Reference Limits</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ROLE CONTAINER 2: MANAGER VIEW -->
+            <div id="espManagerView" class="role-view-panel" style="display: none;">
+                <div class="manager-kpi-grid">
+                    <div class="mgr-kpi-card">
+                        <div class="mgr-kpi-label">Average Warning Lead Time</div>
+                        <div class="mgr-kpi-val" id="mgrLeadTimeVal">—</div>
+                        <div class="mgr-kpi-sub">Advance failure warning window from validated links</div>
+                    </div>
+                    <div class="mgr-kpi-card">
+                        <div class="mgr-kpi-label">False Alarm Rate</div>
+                        <div class="mgr-kpi-val" id="mgrFalseAlarmVal">—</div>
+                        <div class="mgr-kpi-sub">Controlled by persistence timers</div>
+                    </div>
+                    <div class="mgr-kpi-card">
+                        <div class="mgr-kpi-label">Model Verification Status</div>
+                        <div class="mgr-kpi-val status-green" id="mgrSiteValidatedBadge"><i class="fa-solid fa-circle-check"></i> Validated on Site Historian</div>
+                        <div class="mgr-kpi-sub">6 ML Faults + 7 Deterministic Rules</div>
+                    </div>
+                </div>
+                <div class="mgr-coverage-section" style="margin-top: 16px;">
+                    <div style="font-size: 13px; font-weight: 700; color: #38bdf8; margin-bottom: 8px;">
+                        <i class="fa-solid fa-shield-halved"></i> 13-Fault Hybrid Detection Architecture (6 ML Fault Modes + 7 Physics Rules)
+                    </div>
+                    <div id="mgrFaultCoverageTableContainer" class="table-container">
+                        <!-- Dynamically populated from /api/esp/faults/registry -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- ROLE CONTAINER 3: ENGINEER VIEW -->
+            <div id="espEngineerView" class="role-view-panel" style="display: none;">
+                <div class="engineer-grid">
+                    <div class="eng-card">
+                        <div class="eng-card-title"><i class="fa-solid fa-sitemap"></i> Feature Attributions (SHAP Deviation % Contributions)</div>
+                        <div class="shap-grid" id="espShapGrid">
+                            <!-- Dynamic SHAP Bars -->
+                        </div>
+                    </div>
+                    <div class="eng-card">
+                        <div class="eng-card-title"><i class="fa-solid fa-chart-line"></i> Dynamic Trajectory Vector & Technical Rationale</div>
+                        <div class="tech-rationale-box" id="espEngineerTechText">Inference performed on 221 statistical rolling features.</div>
+                        <div class="tech-trajectory-box" id="espEngineerTrajectoryText">Trajectory stable within learned normal manifold.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ROLE CONTAINER 4: INTERNAL LEARNING CENTER -->
+            <div id="espLearningView" class="role-view-panel" style="display: none;">
+                <div class="manager-kpi-grid" style="margin-bottom: 16px;">
+                    <div class="mgr-kpi-card">
+                        <div class="mgr-kpi-label">Active Champion Model</div>
+                        <div class="mgr-kpi-val" id="learningChampionVal" style="font-size: 14px; color: #10b981;">fault_classifier_v1.0</div>
+                        <div class="mgr-kpi-sub" id="learningChampionMetricsSub">Baseline holdout model</div>
+                    </div>
+                    <div class="mgr-kpi-card">
+                        <div class="mgr-kpi-label">Training Candidate Queue</div>
+                        <div class="mgr-kpi-val" id="learningCandidateQueueVal">0 Ready</div>
+                        <div class="mgr-kpi-sub" id="learningCandidateSubVal">Quarantined: 0 | Validated: 0</div>
+                    </div>
+                    <div class="mgr-kpi-card">
+                        <div class="mgr-kpi-label">Field Validation F1</div>
+                        <div class="mgr-kpi-val status-green" id="learningFieldF1Val">—</div>
+                        <div class="mgr-kpi-sub" id="learningFieldLinksSub">From verified field outcomes</div>
+                    </div>
+                </div>
+
+                <!-- 13-Fault Learning Progression Live Matrix -->
+                <div class="mgr-coverage-section">
+                    <div style="font-size: 13px; font-weight: 700; color: #a855f7; margin-bottom: 8px;">
+                        <i class="fa-solid fa-list-check"></i> 13-Fault Continuous Learning & Field Event Progression Matrix
+                    </div>
+                    <div id="learningProgressionTableContainer" class="table-container">
+                        <!-- Dynamically populated from /api/esp/learning/13-fault-progression -->
+                    </div>
+                </div>
+
+                <!-- Model Governance History -->
+                <div class="mgr-coverage-section" style="margin-top: 16px;">
+                    <div style="font-size: 13px; font-weight: 700; color: #38bdf8; margin-bottom: 8px;">
+                        <i class="fa-solid fa-history"></i> Continuous Learning Dataset Generations & Candidate Evaluation History
+                    </div>
+                    <div id="learningRunsTableContainer" class="table-container">
+                        <!-- Dynamically populated from /api/esp/learning/models -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. OPERATING ENVELOPE & OPERATING POINT VS PUMP CURVE SECTION -->
+            <div class="esp-dual-card-row" style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 16px; margin-top: 20px;">
+                <!-- Left: 13 Parameters Operating Envelope Grid -->
+                <div class="envelope-main-card">
+                    <div class="esp-section-header" style="margin-top: 0;">
+                        <div class="section-title"><i class="fa-solid fa-gauge-high"></i> 13 Monitored Physical Parameters vs Operating Envelope</div>
+                    </div>
+                    <div class="esp-envelope-grid" id="espEnvelopeCardsGrid">
+                        <!-- Dynamically Populated by esp_intelligence.js -->
+                    </div>
+                </div>
+
+                <!-- Right: Operating Point vs Pump Curve Card -->
+                <div class="pump-curve-card">
+                    <div class="esp-section-header" style="margin-top: 0;">
+                        <div class="section-title"><i class="fa-solid fa-compass-drafting"></i> Operating Point vs Pump Curve</div>
+                    </div>
+                    <div class="pump-curve-body" id="pumpCurveBody">
+                        <div class="operating-point-box">
+                            <div class="op-title"><i class="fa-solid fa-location-crosshairs"></i> Current Operating Point</div>
+                            <div class="op-metrics-grid">
+                                <div class="op-metric">
+                                    <span class="op-lbl">Flow Rate (Q):</span>
+                                    <strong class="op-val" id="opPointFlow">— BPD</strong>
+                                </div>
+                                <div class="op-metric">
+                                    <span class="op-lbl">Differential Head (ΔP):</span>
+                                    <strong class="op-val" id="opPointHead">— PSI</strong>
+                                </div>
+                                <div class="op-metric">
+                                    <span class="op-lbl">Operating Frequency:</span>
+                                    <strong class="op-val" id="opPointFreq">— Hz</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Honest Unavailable State Notice -->
+                        <div class="pump-curve-unavailable-notice">
+                            <i class="fa-solid fa-triangle-exclamation fa-2x" style="color: #f59e0b; margin-bottom: 8px;"></i>
+                            <div class="notice-title">PUMP CURVE UNAVAILABLE</div>
+                            <p class="notice-text">No validated pump performance curve is currently configured for this asset. Operating point calculated from real canonical telemetry without synthetic curve extrapolation.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. SYNCHRONIZED MULTIVARIATE TIMELINE -->
+            <div class="esp-section-header" style="margin-top: 20px;">
+                <div class="section-title"><i class="fa-solid fa-timeline"></i> Synchronized Multi-Parameter Time-Series Timeline</div>
+            </div>
+            <div class="chart-card esp-timeline-card">
+                <div class="chart-body" style="height: 320px;">
+                    <canvas id="espMultivariateTimelineChart"></canvas>
+                </div>
+            </div>
+        </main>
+
+        <!-- TAB 5: Historical Scenario Replay Mode -->
+        <main id="tab-esp-replay" class="tab-content">
+            <div class="console-panel replay-panel">
+                <div class="replay-controls-row">
+                    <div class="control-group">
+                        <label><i class="fa-solid fa-folder-open"></i> Historical Scenario Sequence:</label>
+                        <select id="selReplayScenario" class="form-select">
+                            <option value="ALL">All Historical Scenarios</option>
+                            <option value="UNDERVOLTAGE">Undervoltage Supply Drop Sequence</option>
+                            <option value="DRY_WELL_PUMP_OFF">Dry-Well Pump Off Fluid Collapse</option>
+                            <option value="SAND_INGESTION">Sand Ingestion & Solids Spike</option>
+                            <option value="BEARING_DEGRADATION">Mechanical Bearing Degradation</option>
+                            <option value="PHASE_IMBALANCE">Electrical Phase Imbalance Sequence</option>
+                            <option value="BLOCKED_INTAKE">Intake Obstruction & Choke Restriction</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label><i class="fa-solid fa-gauge"></i> Playback Speed:</label>
+                        <select id="selReplaySpeed" class="form-select">
+                            <option value="1.0">1.0x (Real-time speed)</option>
+                            <option value="5.0">5.0x (Accelerated)</option>
+                            <option value="10.0">10.0x (High-Speed Analysis)</option>
+                        </select>
+                    </div>
+                    <div class="replay-btn-group">
+                        <button id="btnReplayLoad" class="btn btn-secondary"><i class="fa-solid fa-download"></i> Load Sequence</button>
+                        <button id="btnReplayPlay" class="btn btn-primary"><i class="fa-solid fa-play"></i> Play</button>
+                        <button id="btnReplayPause" class="btn btn-secondary"><i class="fa-solid fa-pause"></i> Pause</button>
+                    </div>
+                    <span id="replayRecordCount" class="meta-tag">0 samples loaded</span>
+                </div>
+            </div>
+        </main>
+
+        <!-- TAB 6: Model Performance & Confusion Matrix -->
+        <main id="tab-esp-perf" class="tab-content">
+            <div class="perf-kpi-row">
+                <div class="mgr-kpi-card">
+                    <div class="mgr-kpi-label">Holdout Test Accuracy</div>
+                    <div class="mgr-kpi-val status-green" id="perfAccuracyVal">—</div>
+                    <div class="mgr-kpi-sub">Evaluated on unseen chronological holdout</div>
+                </div>
+                <div class="mgr-kpi-card">
+                    <div class="mgr-kpi-label">Macro F1 Score</div>
+                    <div class="mgr-kpi-val status-blue" id="perfF1Val">—</div>
+                    <div class="mgr-kpi-sub">Across all 7 historical fault classes</div>
+                </div>
+            </div>
+
+            <div class="esp-section-header">
+                <div class="section-title"><i class="fa-solid fa-table-cells"></i> Multiclass Fault Classifier Confusion Matrix</div>
+            </div>
+            <div class="table-container">
+                <table class="data-table cm-table" id="perfConfusionMatrixTable">
+                    <!-- Populated dynamically -->
+                </table>
+            </div>
+        </main>
+
+        <!-- TAB 7: Site Data Readiness & Checklist -->
+        <main id="tab-esp-readiness" class="tab-content">
+            <div class="readiness-card">
+                <div class="section-title"><i class="fa-solid fa-clipboard-check"></i> Site Sensor Requirements & Scientific Verification Checklist</div>
+                <p class="readiness-intro">The ESP ML models operate with strict scientific integrity. Below is the active parameter verification matrix:</p>
+                <div class="readiness-grid">
+                    <div class="readiness-item ready"><i class="fa-solid fa-circle-check"></i> Discharge Pressure (PDP) - Calibrated in PSI</div>
+                    <div class="readiness-item ready"><i class="fa-solid fa-circle-check"></i> Intake Pressure (PIP) - Calibrated in PSI</div>
+                    <div class="readiness-item ready"><i class="fa-solid fa-circle-check"></i> Motor Current (A) & Load (%) - Continuous Ingestion</div>
+                    <div class="readiness-item ready"><i class="fa-solid fa-circle-check"></i> Motor Temperature (°C) - Winding Thermal Sensor</div>
+                    <div class="readiness-item ready"><i class="fa-solid fa-circle-check"></i> Vibration RMS (g) - Tri-axial Gauge</div>
+                    <div class="readiness-item ready"><i class="fa-solid fa-circle-check"></i> Motor Terminal Voltage (V) & Frequency (Hz)</div>
+                    <div class="readiness-item partial"><i class="fa-solid fa-circle-exclamation"></i> 3-Phase Phase Imbalance - Derived from surface switchboard</div>
+                    <div class="readiness-item ready"><i class="fa-solid fa-circle-check"></i> Zero Temporal Leakage - Chronological Split Enforced</div>
+                    <div class="readiness-item ready"><i class="fa-solid fa-circle-check"></i> Zero Fake Predictions - Gated Uncertainty Thresholds</div>
+                </div>
+            </div>
+        </main>
+
+        <!-- TAB: Live 13-Parameter Real-Time Multi-Graph Dashboard -->
+        <main id="tab-13-params" class="tab-content">
+            <div class="params13-dashboard-wrap">
+                <!-- Control Toolbar -->
+                <div class="params13-header-controls">
+                    <div class="params13-ctrl-left">
+                        <div class="params13-well-selector-wrap">
+                            <span class="params13-select-label"><i class="fa-solid fa-oil-well"></i> Selected Pump:</span>
+                            <select id="sel13ParamWellFilter" class="params13-well-dropdown">
+                                <!-- Populated dynamically from /api/esp/wells -->
+                            </select>
+                        </div>
+
+                        <div class="params13-stats-banner">
+                            <div class="params13-stat-badge">
+                                <span>Active Asset:</span>
+                                <span id="lbl13ParamActiveAsset" class="params13-stat-val">FS-010</span>
+                            </div>
+                            <div class="params13-stat-badge">
+                                <span>Ingested:</span>
+                                <span id="lbl13ParamPacketCount" class="params13-stat-val">0 pkts</span>
+                            </div>
+                            <div class="params13-stat-badge">
+                                <span>Last Update:</span>
+                                <span id="lbl13ParamLastTime" class="params13-stat-val">--:--:--</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="params13-ctrl-right">
+                        <!-- Time Window Range Filters -->
+                        <div class="params13-window-group" title="Time-series history window">
+                            <button class="btn-param13-window" data-window="30s">30s</button>
+                            <button class="btn-param13-window" data-window="1m">1m</button>
+                            <button class="btn-param13-window" data-window="5m">5m</button>
+                            <button class="btn-param13-window" data-window="15m">15m</button>
+                            <button class="btn-param13-window active" data-window="6h">6h</button>
+                            <button class="btn-param13-window" data-window="24h">24h</button>
+                            <button class="btn-param13-window" data-window="all">All</button>
+                        </div>
+
+                        <!-- Grid Columns Switcher -->
+                        <div class="params13-grid-cols-group" title="Change layout grid columns">
+                            <button class="btn-param13-grid-cols active" data-cols="3"><i class="fa-solid fa-table-cells"></i> 3-Col</button>
+                            <button class="btn-param13-grid-cols" data-cols="4"><i class="fa-solid fa-table-cells-large"></i> 4-Col</button>
+                            <button class="btn-param13-grid-cols" data-cols="2"><i class="fa-solid fa-pause"></i> 2-Col</button>
+                        </div>
+
+                        <!-- Pause / Resume Stream -->
+                        <button id="btn13ParamTogglePause" class="btn btn-small btn-warning" title="Pause or resume live chart updates">
+                            <i class="fa-solid fa-pause"></i> Pause Stream
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 13 Real-Time Dynamic Parameter Graphs Container -->
+                <div id="param13GridContainer" class="param13-grid" data-cols="3">
+                    <!-- Populated dynamically with 13 Chart.js graphs -->
+                </div>
+            </div>
+        </main>
+
+    </div>
+
+    <!-- MODAL: Raw JSON / Payload Inspector -->
+    <div id="jsonModal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fa-solid fa-code"></i> Telemetry Payload Inspector</div>
+                <button class="modal-close-btn" id="btnCloseJsonModal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="payload-meta-tags" id="modalMetaTags"></div>
+                <pre class="json-code-block" id="modalJsonContent"></pre>
+            </div>
+            <div class="modal-footer">
+                <button id="btnCopyJson" class="btn btn-secondary"><i class="fa-solid fa-copy"></i> Copy JSON</button>
+                <button class="btn btn-primary" id="btnDoneJsonModal">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FLOATING WINDOW MODAL: SQLite Storage & Collection Metrics -->
+    <div id="dbStatsModal" class="modal-overlay">
+        <div class="modal-card modal-card-large">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fa-solid fa-database" style="color: var(--color-primary);"></i>
+                    <span>SQLite Storage & Collection Overview</span>
+                </div>
+                <div class="modal-header-actions">
+                    <button class="btn btn-small btn-secondary" id="btnRefreshDbModal" title="Refresh Storage Statistics">
+                        <i class="fa-solid fa-rotate"></i> Refresh
+                    </button>
+                    <button class="modal-close-btn" id="btnCloseDbStatsModal"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            </div>
+
+            <div class="modal-body db-modal-body">
+                <!-- Overview Stats Cards -->
+                <div class="db-stats-overview-grid">
+                    <div class="db-stat-tile">
+                        <div class="db-stat-icon"><i class="fa-solid fa-layer-group"></i></div>
+                        <div class="db-stat-content">
+                            <div class="db-stat-num" id="dbModalTotalRecords">0</div>
+                            <div class="db-stat-title">Total Records Ingested</div>
+                        </div>
+                    </div>
+
+                    <div class="db-stat-tile">
+                        <div class="db-stat-icon icon-emerald"><i class="fa-solid fa-tags"></i></div>
+                        <div class="db-stat-content">
+                            <div class="db-stat-num" id="dbModalLabelledCount">0</div>
+                            <div class="db-stat-title">Labelled (with Scenarios)</div>
+                        </div>
+                    </div>
+
+                    <div class="db-stat-tile">
+                        <div class="db-stat-icon icon-cyan"><i class="fa-solid fa-chart-simple"></i></div>
+                        <div class="db-stat-content">
+                            <div class="db-stat-num" id="dbModalUnlabelledCount">0</div>
+                            <div class="db-stat-title">Unlabelled (Pure Params)</div>
+                        </div>
+                    </div>
+
+                    <div class="db-stat-tile">
+                        <div class="db-stat-icon icon-purple"><i class="fa-solid fa-hard-drive"></i></div>
+                        <div class="db-stat-content">
+                            <div class="db-stat-num" id="dbModalFileSize">0 KB</div>
+                            <div class="db-stat-title">SQLite Database Size</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Status Distribution Pills -->
+                <div class="db-status-distribution-bar">
+                    <span class="dist-label"><i class="fa-solid fa-chart-pie"></i> Health Distribution:</span>
+                    <span class="status-badge status-badge-NORMAL" id="dbModalNormalCount">Normal: 0</span>
+                    <span class="status-badge status-badge-WARNING" id="dbModalWarningCount">Warning: 0</span>
+                    <span class="status-badge status-badge-CRITICAL" id="dbModalCriticalCount">Critical: 0</span>
+                </div>
+
+                <!-- Modal Sub-Tabs Navigation -->
+                <div class="modal-subtabs-bar">
+                    <button class="modal-subtab-btn active" id="btnSubtabSummary" data-subtab="subtab-summary">
+                        <i class="fa-solid fa-chart-bar"></i> Asset-Wise Summary (<span id="modalTabAssetCount">27</span> Fleets)
+                    </button>
+                    <button class="modal-subtab-btn" id="btnSubtabAllRecords" data-subtab="subtab-all-records">
+                        <i class="fa-solid fa-database"></i> Browse All Individual Records (<span id="modalTabTotalCount">50,000+</span> Rows)
+                    </button>
+                </div>
+
+                <!-- SUBTAB 1: Asset-Wise Breakdown Table -->
+                <div id="subtab-summary" class="modal-subtab-content active">
+                    <div class="db-breakdown-section">
+                        <div class="section-title">
+                            <i class="fa-solid fa-table"></i> Asset & Well Fleet Storage Summary
+                            <span class="badge-subtle">Click any row to drill down into its individual records</span>
+                        </div>
+                        <div class="db-breakdown-table-wrapper">
+                            <table class="db-breakdown-table">
+                                <thead>
+                                    <tr>
+                                        <th>Asset / Well ID</th>
+                                        <th>Wells</th>
+                                        <th>Total Records</th>
+                                        <th>🏷️ Labelled</th>
+                                        <th>📊 Unlabelled</th>
+                                        <th style="width: 120px;">Share (%)</th>
+                                        <th>Avg Discharge P</th>
+                                        <th>Avg Intake P</th>
+                                        <th>Avg Flow</th>
+                                        <th>First Record</th>
+                                        <th>Latest Record</th>
+                                        <th style="width: 60px; text-align: center;">View</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dbModalAssetTableBody">
+                                    <tr>
+                                        <td colspan="12" class="text-center">Loading storage breakdown...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SUBTAB 2: Browse All Individual Time-Series Records -->
+                <div id="subtab-all-records" class="modal-subtab-content">
+                    <div class="db-records-explorer">
+                        <div class="modal-explorer-toolbar">
+                            <div class="modal-search-box">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                                <input type="text" id="txtModalRecordSearch" placeholder="Search Well, Scenario, Trip...">
+                            </div>
+
+                            <div class="view-filter-item">
+                                <label><i class="fa-solid fa-tags"></i> Category:</label>
+                                <select id="selModalCategoryFilter" class="form-select-sm">
+                                    <option value="ALL">All Categories</option>
+                                    <option value="LABELLED">🏷️ Labelled</option>
+                                    <option value="UNLABELLED">📊 Unlabelled</option>
+                                </select>
+                            </div>
+
+                            <div class="view-filter-item">
+                                <label><i class="fa-solid fa-triangle-exclamation"></i> Fault:</label>
+                                <select id="selModalScenarioFilter" class="form-select-sm">
+                                    <option value="ALL">All Faults</option>
+                                    <option value="ANOMALIES_ONLY">⚠️ Anomalies / Faults Only</option>
+                                    <option value="normal">🟢 Normal</option>
+                                    <option value="dry_well_pump_off">🏜️ Dry-Well Pump Off</option>
+                                    <option value="blocked_intake">🚫 Blocked Intake</option>
+                                    <option value="scale_or_pump_wear">⚙️ Scale / Pump Wear</option>
+                                    <option value="sand_ingestion">🏖️ Sand Ingestion</option>
+                                    <option value="bearing_degradation">🔧 Bearing Degradation</option>
+                                    <option value="high_viscosity_cold_start">❄️ Cold Start</option>
+                                    <option value="high_backpressure">📈 High Backpressure</option>
+                                    <option value="open_choke">🎛️ Open Choke</option>
+                                    <option value="undervoltage">⚡ Undervoltage</option>
+                                    <option value="phase_imbalance">🔌 Phase Imbalance</option>
+                                    <option value="motor_overload">🔥 Motor Overload</option>
+                                    <option value="power_loss">🌑 Power Loss</option>
+                                    <option value="sensor_drift">📡 Sensor Drift</option>
+                                    <option value="gas_interference_to_lock">🟡 Gas Lock</option>
+                                </select>
+                            </div>
+
+                            <div class="view-filter-item">
+                                <label><i class="fa-solid fa-power-off"></i> Trip:</label>
+                                <select id="selModalTripFilter" class="form-select-sm">
+                                    <option value="ALL">All States</option>
+                                    <option value="RUNNING_ONLY">🟢 Running</option>
+                                    <option value="TRIPPED_ANY">🔴 Tripped (Any)</option>
+                                    <option value="GAS_LOCK_UNDERLOAD">⚠️ Gas Lock</option>
+                                    <option value="UNDER_VOLTAGE">⚠️ Under-Volt</option>
+                                    <option value="HIGH_VIBRATION">⚠️ High Vib</option>
+                                    <option value="OVERLOAD_SOLIDS">⚠️ Overload</option>
+                                    <option value="MOTOR_OVERLOAD">⚠️ Motor Over</option>
+                                    <option value="BROKEN_SHAFT_UNDERLOAD">⚠️ Broken Shaft</option>
+                                    <option value="PHASE_IMBALANCE">⚠️ Phase Imbal</option>
+                                    <option value="UNDERLOAD_PUMP_OFF">⚠️ Pump-Off</option>
+                                </select>
+                            </div>
+
+                            <div class="view-filter-item">
+                                <label><i class="fa-solid fa-bell"></i> Alarms:</label>
+                                <select id="selModalAlarmFilter" class="form-select-sm">
+                                    <option value="ALL">All Alarms</option>
+                                    <option value="WITH_ALARMS">🚨 Active Alarms</option>
+                                    <option value="NO_ALARMS">✅ Clean</option>
+                                </select>
+                            </div>
+
+                            <div class="view-filter-item">
+                                <label><i class="fa-solid fa-building"></i> Well:</label>
+                                <select id="selModalWellFilter" class="form-select-sm">
+                                    <option value="ALL">All Wells</option>
+                                </select>
+                            </div>
+
+                            <div class="explorer-counter" id="modalRecordsCounter">
+                                Showing 0 of 0
+                            </div>
+                        </div>
+
+                        <div class="db-breakdown-table-wrapper" style="max-height: 320px;">
+                            <table class="db-breakdown-table" id="tblModalAllRecords">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 60px;">ID</th>
+                                        <th style="width: 125px;">Time (UTC)</th>
+                                        <th style="width: 85px;">Category</th>
+                                        <th style="width: 80px;">Well</th>
+                                        <th style="width: 150px;">Fault / Alarms</th>
+                                        <th>Discharge P</th>
+                                        <th>Intake P</th>
+                                        <th>Flow (BPD)</th>
+                                        <th>Freq (Hz)</th>
+                                        <th>Current (A)</th>
+                                        <th>Temp (°C)</th>
+                                        <th>State / Trip</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="modalAllRecordsTableBody">
+                                    <tr>
+                                        <td colspan="12" class="text-center">Loading individual time-series entries...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="modal-pagination-bar">
+                            <span id="modalPaginationInfo">Showing page 1</span>
+                            <button id="btnModalLoadMoreRows" class="btn btn-small btn-secondary">
+                                <i class="fa-solid fa-arrow-down"></i> Load Next 100 Records
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="modal-footer">
+                <div class="modal-footer-left">
+                    <button class="btn btn-secondary btn-small" id="btnModalExportLabelledCSV"><i class="fa-solid fa-tags"></i> Export Labelled (CSV)</button>
+                    <button class="btn btn-secondary btn-small" id="btnModalExportUnlabelledCSV"><i class="fa-solid fa-file-csv"></i> Export Unlabelled (CSV)</button>
+                    <button class="btn btn-secondary btn-small" id="btnModalExportJSON"><i class="fa-solid fa-code"></i> Export JSON</button>
+                </div>
+                <button class="btn btn-primary" id="btnDoneDbStatsModal">Close Window</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <script src="/static/js/app.js"></script>
+    <script src="/static/js/esp_intelligence.js"></script>
+    <script src="/static/js/esp_replay.js"></script>
+    <script src="/static/js/param13_graphs.js"></script>
+</body>
+</html>
+

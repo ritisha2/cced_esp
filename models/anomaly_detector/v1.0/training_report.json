@@ -1,0 +1,8 @@
+{
+  "model_type": "IsolationForest_Plus_PCA",
+  "version": "v1.0",
+  "created_at": "2026-08-25T09:36:04.244950+00:00",
+  "healthy_training_samples": 15256,
+  "features_used": 221,
+  "calibrated_threshold": 0.55
+}

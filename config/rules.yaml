@@ -1,0 +1,137 @@
+# ESP Deterministic Multivariate Fault Rule Configuration
+# Transparent, verifiable safety and operational fault logic.
+
+rules:
+  - id: "RULE_DRY_WELL_PUMP_OFF"
+    fault: "DRY_WELL_PUMP_OFF"
+    severity: "CRITICAL"
+    persistence_seconds: 0
+    conditions:
+      - "intake_pressure_psi < 120.0"
+      - "motor_current_a < 18.0"
+      - "liquid_rate_bpd < 300.0"
+    explanation: "Pump intake pressure collapsed and motor in severe electrical underload indicating loss of prime / pump-off."
+    operator_action: "Throttle production choke or pause pump to allow reservoir fluid level recovery."
+
+  - id: "RULE_BLOCKED_INTAKE"
+    fault: "BLOCKED_INTAKE"
+    severity: "CRITICAL"
+    persistence_seconds: 0
+    conditions:
+      - "intake_pressure_psi < 140.0"
+      - "liquid_rate_bpd < 400.0"
+      - "discharge_pressure_psi < 1600.0"
+    explanation: "Severe reduction in intake pressure and flow rate while motor running indicates physical intake screen obstruction."
+    operator_action: "Perform backwash or cycle pump; inspect downhole intake for scale/debris."
+
+  - id: "RULE_SCALE_OR_PUMP_WEAR"
+    fault: "SCALE_OR_PUMP_WEAR"
+    severity: "WARNING"
+    persistence_seconds: 0
+    conditions:
+      - "differential_pressure_psi < 1400.0"
+      - "liquid_rate_bpd < 750.0"
+      - "motor_load_pct > 70.0"
+    explanation: "Degraded differential head generation at high motor load indicates hydraulic pump stage wear or scale encrustation."
+    operator_action: "Schedule chemical scale treatment or plan pump workover."
+
+  - id: "RULE_SAND_INGESTION"
+    fault: "SAND_INGESTION"
+    severity: "CRITICAL"
+    persistence_seconds: 0
+    conditions:
+      - "vibration_rms > 0.40"
+      - "motor_current_a_std > 2.5"
+    explanation: "Elevated mechanical vibration surge with rapid motor current oscillation indicates abrasive sand/solids ingestion."
+    operator_action: "Choke well to reduce fluid drawdown velocity; verify sand filtration."
+
+  - id: "RULE_BEARING_DEGRADATION"
+    fault: "BEARING_DEGRADATION"
+    severity: "CRITICAL"
+    persistence_seconds: 0
+    conditions:
+      - "vibration_rms > 0.35"
+      - "motor_temperature_c > 108.0"
+    explanation: "Elevated mechanical vibration coupled with rising motor temperature indicates progressive bearing degradation."
+    operator_action: "Monitor vibration harmonics closely; schedule pump changeout before catastrophic seizure."
+
+  - id: "RULE_HIGH_VISCOSITY_COLD_START"
+    fault: "HIGH_VISCOSITY_COLD_START"
+    severity: "WARNING"
+    persistence_seconds: 0
+    conditions:
+      - "motor_load_pct > 92.0"
+      - "motor_temperature_c < 60.0"
+      - "liquid_rate_bpd < 500.0"
+    explanation: "High motor load with low initial fluid temperature indicates heavy crude viscosity startup resistance."
+    operator_action: "Allow gradual thermal stabilization; maintain controlled ramp frequency."
+
+  - id: "RULE_HIGH_BACKPRESSURE"
+    fault: "HIGH_BACKPRESSURE"
+    severity: "WARNING"
+    persistence_seconds: 0
+    conditions:
+      - "discharge_pressure_psi > 2300.0"
+      - "liquid_rate_bpd < 800.0"
+    explanation: "Elevated discharge pressure and depressed liquid rate indicate excessive surface or flowline backpressure."
+    operator_action: "Inspect surface valves, flowlines, and separator pressure."
+
+  - id: "RULE_OPEN_CHOKE"
+    fault: "OPEN_CHOKE"
+    severity: "WARNING"
+    persistence_seconds: 0
+    conditions:
+      - "liquid_rate_bpd > 1200.0"
+      - "discharge_pressure_psi < 1850.0"
+    explanation: "Excessive liquid production rate with depressed discharge head indicates surface choke over-opened."
+    operator_action: "Trim choke orifice to restore ESP to its recommended operating range (ROR)."
+
+  - id: "RULE_UNDERVOLTAGE"
+    fault: "UNDERVOLTAGE"
+    severity: "CRITICAL"
+    persistence_seconds: 0
+    conditions:
+      - "motor_voltage_v < 390.0"
+    explanation: "Motor supply voltage depressed significantly below electrical operating limits."
+    operator_action: "Inspect surface power grid, transformer taps, and VFD DC bus voltage."
+
+  - id: "RULE_PHASE_IMBALANCE"
+    fault: "PHASE_IMBALANCE"
+    severity: "WARNING"
+    persistence_seconds: 0
+    conditions:
+      - "motor_current_a_std > 3.0"
+      - "motor_temperature_c > 105.0"
+    explanation: "Electrical current fluctuations and motor thermal rise indicate possible electrical phase unbalance."
+    operator_action: "Perform phase-level voltage and current balance check at surface switchboard."
+
+  - id: "RULE_MOTOR_OVERLOAD"
+    fault: "MOTOR_OVERLOAD"
+    severity: "CRITICAL"
+    persistence_seconds: 0
+    conditions:
+      - "motor_current_a > 39.0"
+      - "motor_temperature_c > 110.0"
+    explanation: "Sustained high motor current and elevated winding temperature indicate severe motor thermal overload."
+    operator_action: "Reduce operating frequency or throttle choke immediately to prevent motor burnout."
+
+  - id: "RULE_POWER_LOSS"
+    fault: "POWER_LOSS"
+    severity: "CRITICAL"
+    persistence_seconds: 0
+    conditions:
+      - "motor_voltage_v < 50.0"
+      - "motor_current_a < 1.0"
+    explanation: "Instantaneous collapse of motor supply voltage and current indicating total power interruption."
+    operator_action: "Inspect surface power feeder, circuit breakers, and VFD fault codes."
+
+  - id: "RULE_SENSOR_DRIFT"
+    fault: "SENSOR_DRIFT"
+    severity: "WARNING"
+    persistence_seconds: 0
+    conditions:
+      - "intake_pressure_psi < 80.0"
+      - "liquid_rate_bpd > 900.0"
+    explanation: "Disagreement between pressure gauge reading and surface liquid rate indicates possible downhole sensor calibration drift."
+    operator_action: "Perform downhole gauge diagnostics; rely on secondary casing/surface pressure models."
+

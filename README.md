@@ -1,93 +1,134 @@
-# CCED-ESP-AI_ML
+# CCED-ESP-AI_ML: ESP Surveillance, Telemetry & Intelligence Platform
 
+An industrial-grade, real-time data collection, storage, and monitoring system for **OPG & ESP (Electric Submersible Pump) Wells**, categorized by **Asset ID** via **MQTT**, storing data in **SQLite** in an optimized **Time-Series format**, featuring a high-performance **Live Table / Ledger Dashboard**, 13 Canonical Engineering Telemetry Channels, Dual-Tier ML Diagnostics, Operating Envelopes, Pump Performance Curves, and Asset Registry.
 
+---
 
-## Getting started
+## Key Features
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+1. **Asset-Categorized Ingestion**:
+   - Collects telemetry grouped by `ASSET_ID` and `WELL_ID`.
+   - Flexible JSON normalization (handles pressure, temperature, flow rates, water cut, gas flow, choke %, battery voltage, sensor health, and raw payloads).
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+2. **SQLite Time-Series Storage**:
+   - High-throughput **WAL (Write-Ahead Logging)** mode with in-memory caching and batch writes.
+   - Compound indexes on `(asset_id, timestamp)`, `(well_id, timestamp)`, and `(timestamp)`.
 
-## Add your files
+3. **Dynamic Pipeline Controls**:
+   - **Play / Resume / Pause**: Pause ingestion at any time without dropping connection.
+   - **Pause Buffer Policy**: Optionally buffer incoming telemetry during pause and flush on resume, or drop discarded packets.
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
+4. **Dynamic Ingestion Filters**:
+   - **Filter Modes**: `ALL` (ingest everything), `WHITELIST` (ingest selected Asset IDs only), `BLACKLIST` (block specific assets).
+   - **Interactive Asset Chips**: Click-to-toggle allowed Asset IDs on the fly.
+   - **Threshold Rules**: Dynamic Min/Max Pressure (PSI) filtering.
+
+5. **Live Ledger & Analytics Dashboard**:
+   - Real-time row insertion with glowing status pulses over WebSockets.
+   - Live KPI cards: Total SQLite Records, Ingestion Rate (`msg/s`), Active Asset Count, Filtered / Buffer Counts.
+   - Instant Search & Filter by Asset ID, Well ID, Status (`NORMAL`, `WARNING`, `CRITICAL`), or keyword.
+   - Interactive **Time-Series Charts** (Chart.js) for Pressure, Temperature, Liquid Flow, and Gas Flow trends.
+   - **Asset Fleet Summary Cards** showing average pressures, water cut, and last-seen timestamps.
+   - **Raw JSON Inspector**: View and copy formatted payload metadata with one click.
+   - **One-Click Export**: Export stored data to CSV or JSON.
+   - **Built-in Realistic Multi-Well Simulator**: Generates live realistic well physics telemetry out-of-the-box.
+
+---
+
+## Quick Start
+
+### 1. Launch with One Click
+In PowerShell or Command Prompt, run:
+```powershell
+.\start.ps1
+```
+or
+```bat
+start.bat
+```
+or manually:
+```bash
+python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+### 2. Access the Dashboard
+Open your browser at:
+👉 **[http://localhost:8000](http://localhost:8000)**
+
+---
+
+## MQTT Configuration & Topic Structure
+
+### Supported MQTT Topics:
+- `opg/wells/<asset_id>/telemetry` (e.g. `opg/wells/ASSET-TX-PERMIAN-01/telemetry`)
+- `opg/<asset_id>/data`
+- `wells/#`
+
+### Sample MQTT Payload (JSON):
+```json
+{
+  "asset_id": "ASSET-TX-PERMIAN-01",
+  "well_id": "WELL-TX-101",
+  "timestamp": "2026-08-25T04:15:00Z",
+  "pressure_psi": 2450.5,
+  "temperature_c": 72.4,
+  "flow_rate_bpd": 1250.0,
+  "gas_flow_mscfd": 680.0,
+  "water_cut_pct": 22.0,
+  "choke_size_pct": 45.0,
+  "status": "NORMAL",
+  "sensor_health": "OK",
+  "battery_volts": 24.1
+}
+```
+
+*Note: The ingestion parser also gracefully handles varying field names such as `tubing_pressure`, `casing_pressure`, `oil_rate_bpd`, `temp_c`, or raw string payloads.*
+
+---
+
+## REST API Overview
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/status` | Live collector stats, MQTT status, SQLite record counts |
+| `POST` | `/api/control` | Pipeline control (`play`, `pause`, `resume`, `clear_buffer`) |
+| `GET` | `/api/filters` | Active ingestion filter configuration and discovered assets |
+| `POST` | `/api/filters` | Update dynamic filter rules (whitelist, mode, pressure limits) |
+| `GET` | `/api/telemetry` | Paginated query of time-series records from SQLite |
+| `GET` | `/api/assets` | Fleet-level aggregated summaries and distinct assets |
+| `GET` | `/api/analytics/timeseries` | Chronological points for time-series charts |
+| `GET` | `/api/export/csv` | Download filtered dataset in CSV format |
+| `GET` | `/api/export/json` | Download filtered dataset in JSON format |
+| `POST` | `/api/mqtt/config` | Update MQTT Broker host/port/credentials dynamically |
+| `POST` | `/api/simulator/toggle` | Start/stop the built-in multi-well simulator |
+| `POST` | `/api/database/clear` | Truncate telemetry table in SQLite |
+| `WS` | `/ws/live` | WebSocket stream for zero-latency live updates |
+
+---
+
+## Project Structure
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.tasind.com/Shetty/cced-esp-ai_ml.git
-git branch -M main
-git push -uf origin main
+esp/
+├── backend/
+│   ├── __init__.py
+│   ├── config.py           # MQTT, database, and ingestion state config
+│   ├── database.py         # SQLite WAL time-series manager & queries
+│   ├── mqtt_collector.py   # Async MQTT subscriber & dynamic filter engine
+│   ├── simulator.py        # Realistic OPG multi-well telemetry simulator
+│   └── main.py             # FastAPI REST + WebSocket application
+├── frontend/
+│   ├── index.html          # SCADA dashboard interface
+│   ├── css/
+│   │   └── styles.css      # Dark-mode industrial glassmorphism styling
+│   └── js/
+│       └── app.js          # Real-time WebSocket logic, charts & table
+├── frontend-react/         # React SPA Operations Center
+├── ml/                     # Dual-Tier ML Inference & ISO Rule Engine
+├── data/
+│   └── opg_wells.db        # SQLite Time-Series Database
+├── requirements.txt
+├── start.bat
+├── start.ps1
+└── README.md
 ```
-
-## Integrate with your tools
-
-- [ ] [Set up project integrations](https://gitlab.tasind.com/Shetty/cced-esp-ai_ml/-/settings/integrations)
-
-## Collaborate with your team
-
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
-
-## Test and Deploy
-
-Use the built-in continuous integration in GitLab.
-
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
-
-***
-
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.

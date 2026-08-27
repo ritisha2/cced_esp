@@ -1,0 +1,28 @@
+{
+  "model_type": "MultiHorizonRiskRandomForest",
+  "version": "v1.0",
+  "created_at": "2026-08-25T09:29:23.300329+00:00",
+  "horizons": {
+    "1h": {
+      "horizon_label": "1h",
+      "horizon_steps": 10,
+      "roc_auc": 0.6224062347783732,
+      "pr_auc": 0.9990344706604875,
+      "brier_score": 0.0024261266687998504
+    },
+    "6h": {
+      "horizon_label": "6h",
+      "horizon_steps": 60,
+      "roc_auc": 0.5,
+      "pr_auc": 0.9927113702623906,
+      "brier_score": 0.9854227405247813
+    },
+    "24h": {
+      "horizon_label": "24h",
+      "horizon_steps": 240,
+      "roc_auc": 0.5,
+      "pr_auc": 0.9708454810495627,
+      "brier_score": 0.9416909620991254
+    }
+  }
+}

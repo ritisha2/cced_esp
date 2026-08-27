@@ -1,0 +1,146 @@
+# ESP Parameter Operating Envelopes Configuration
+# Calibrated against empirical operating envelopes from site historian telemetry.
+
+envelopes:
+  liquid_rate_bpd:
+    name: "Total Liquid Production Rate"
+    unit: "BPD"
+    reference_min: 250.0
+    reference_max: 650.0
+    engineering_min: 50.0
+    engineering_max: 1200.0
+    critical_low: 20.0
+    critical_high: 1600.0
+    description: "Surface liquid production rate."
+
+  intake_pressure_psi:
+    name: "Pump Intake Pressure (PIP)"
+    unit: "PSI"
+    reference_min: 200.0
+    reference_max: 650.0
+    engineering_min: 120.0
+    engineering_max: 950.0
+    critical_low: 80.0
+    critical_high: 1200.0
+    description: "Downhole pump intake pressure. Low PIP risks pump cavitation / gas interference."
+
+  discharge_pressure_psi:
+    name: "Pump Discharge Pressure (PDP)"
+    unit: "PSI"
+    reference_min: 1200.0
+    reference_max: 1800.0
+    engineering_min: 800.0
+    engineering_max: 2400.0
+    critical_low: 200.0
+    critical_high: 2600.0
+    description: "Downhole pump discharge pressure against fluid column and surface backpressure."
+
+  motor_current_a:
+    name: "Motor Current"
+    unit: "A"
+    reference_min: 8.0
+    reference_max: 16.0
+    engineering_min: 5.0
+    engineering_max: 38.0
+    critical_low: 2.0
+    critical_high: 45.0
+    description: "Downhole motor electrical draw. Underload indicates dry pump; overload indicates solids or mechanical drag."
+
+  motor_load_pct:
+    name: "Motor Load"
+    unit: "%"
+    reference_min: 20.0
+    reference_max: 45.0
+    engineering_min: 10.0
+    engineering_max: 95.0
+    critical_low: 5.0
+    critical_high: 115.0
+    description: "Percentage of rated motor horsepower (DERIVED)."
+
+  motor_temperature_c:
+    name: "Motor Temperature"
+    unit: "°C"
+    reference_min: 65.0
+    reference_max: 85.0
+    engineering_min: 40.0
+    engineering_max: 110.0
+    critical_low: 25.0
+    critical_high: 125.0
+    description: "Internal motor winding / dielectric oil temperature."
+
+  vibration_rms:
+    name: "Pump Vibration RMS"
+    unit: "g"
+    reference_min: 0.10
+    reference_max: 0.25
+    engineering_min: 0.05
+    engineering_max: 0.40
+    critical_low: 0.01
+    critical_high: 0.60
+    description: "Mechanical vibration amplitude. Surges indicate bearing wear, gas slugging, or sand ingestion."
+
+  motor_voltage_v:
+    name: "Motor Supply Voltage"
+    unit: "V"
+    reference_min: 720.0
+    reference_max: 820.0
+    engineering_min: 400.0
+    engineering_max: 920.0
+    critical_low: 380.0
+    critical_high: 980.0
+    description: "Terminal voltage supplied by surface VFD / transformer."
+
+  intake_temperature_c:
+    name: "Intake Fluid Temperature"
+    unit: "°C"
+    reference_min: 45.0
+    reference_max: 75.0
+    engineering_min: 25.0
+    engineering_max: 90.0
+    critical_low: 15.0
+    critical_high: 105.0
+    description: "Intake wellbore fluid temperature."
+
+  flowline_pressure_psi:
+    name: "Flowline Header Pressure"
+    unit: "PSI"
+    reference_min: 80.0
+    reference_max: 200.0
+    engineering_min: 40.0
+    engineering_max: 350.0
+    critical_low: 10.0
+    critical_high: 450.0
+    description: "Surface flowline pressure."
+
+  wellhead_pressure_psi:
+    name: "Wellhead Tubing Pressure"
+    unit: "PSI"
+    reference_min: 100.0
+    reference_max: 250.0
+    engineering_min: 50.0
+    engineering_max: 400.0
+    critical_low: 10.0
+    critical_high: 500.0
+    description: "Surface wellhead pressure."
+
+  casing_pressure_psi:
+    name: "Casing Annulus Pressure"
+    unit: "PSI"
+    reference_min: 80.0
+    reference_max: 200.0
+    engineering_min: 30.0
+    engineering_max: 350.0
+    critical_low: 5.0
+    critical_high: 450.0
+    description: "Casing annulus pressure."
+
+  choke_size_64in:
+    name: "Surface Choke Orifice Size"
+    unit: "/64 in"
+    reference_min: 24.0
+    reference_max: 48.0
+    engineering_min: 12.0
+    engineering_max: 64.0
+    critical_low: 4.0
+    critical_high: 96.0
+    description: "Surface production choke opening."

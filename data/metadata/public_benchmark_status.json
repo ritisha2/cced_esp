@@ -1,0 +1,24 @@
+{
+  "espset_vibration": {
+    "status": "REGISTERED",
+    "doi": "10.17632/m268jsw339.1",
+    "samples": 145200,
+    "classes": [
+      "NORMAL",
+      "BEARING_DEGRADATION",
+      "SAND_INGESTION"
+    ]
+  },
+  "nln_emp_pump": {
+    "status": "REGISTERED",
+    "doi": "10.4121/uuid:154b7c62-550a-48a5-927e-8c3104e76d91",
+    "samples": 88400,
+    "classes": [
+      "NORMAL",
+      "BLOCKED_INTAKE",
+      "HIGH_BACKPRESSURE",
+      "MOTOR_OVERLOAD",
+      "UNDERVOLTAGE"
+    ]
+  }
+}
