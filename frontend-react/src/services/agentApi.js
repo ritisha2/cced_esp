@@ -12,7 +12,7 @@ export const agentApi = {
    */
   async warmup() {
     try {
-      fetch(`${AGENT_BASE_URL}/warmup`, { method: 'POST', signal: AbortSignal.timeout(5000) }).catch(() => {});
+      fetch(`${AGENT_BASE_URL}/warmup`, { method: 'POST' }).catch(() => {});
     } catch (e) {
       // background fire and forget
     }
