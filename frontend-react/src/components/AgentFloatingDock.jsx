@@ -34,6 +34,11 @@ export const AgentFloatingDock = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // Pre-warm LLM models immediately when Frontend renders to eliminate cold-start latency
+  useEffect(() => {
+    agentApi.warmup();
+  }, []);
+
   useEffect(() => {
     if (isOpen) {
       scrollToBottom();

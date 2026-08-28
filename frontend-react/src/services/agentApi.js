@@ -8,6 +8,17 @@ const AGENT_BASE_URL = '/api/agent';
 
 export const agentApi = {
   /**
+   * Pre-warm LLM Gateway & Supervisor graph on frontend initialization to eliminate cold start.
+   */
+  async warmup() {
+    try {
+      fetch(`${AGENT_BASE_URL}/warmup`, { method: 'POST', signal: AbortSignal.timeout(5000) }).catch(() => {});
+    } catch (e) {
+      // background fire and forget
+    }
+  },
+
+  /**
    * Check connection status of esp_agent backend gateway.
    * Returns boolean (true if backend is healthy, false otherwise).
    */
