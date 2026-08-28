@@ -1,4 +1,4 @@
-﻿import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { PARAM_CONFIGS } from '../constants/telemetryTags';
 
 const TelemetryContext = createContext(null);
@@ -337,13 +337,15 @@ export const TelemetryProvider = ({ children }) => {
           } catch (e) { console.warn('[TelemetryContext] WS parse error:', e); }
         };
 
-        ws.onclose = () => {
+        ws.onclose = (evt) => {
           if (!unmounted) {
-            console.log('[WS] WebSocket closed, reconnecting...');
+            console.log('[WS] WebSocket disconnected, reconnecting in 3s...', evt.reason || '');
             reconnectTimeoutRef.current = setTimeout(connectWebSocket, 3000);
           }
         };
-        ws.onerror = () => ws.close();
+        ws.onerror = (err) => {
+          console.debug('[WS] Connection error');
+        };
       } catch (err) {
         if (!unmounted) reconnectTimeoutRef.current = setTimeout(connectWebSocket, 5000);
       }
@@ -352,10 +354,23 @@ export const TelemetryProvider = ({ children }) => {
     connectWebSocket();
     return () => {
       unmounted = true;
-      if (wsRef.current) wsRef.current.close();
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      if (wsRef.current) {
+        const socket = wsRef.current;
+        wsRef.current = null;
+        socket.onopen = null;
+        socket.onclose = null;
+        socket.onerror = null;
+        if (socket.readyState === WebSocket.OPEN) {
+          socket.close();
+        } else if (socket.readyState === WebSocket.CONNECTING) {
+          socket.onopen = () => {
+            try { socket.close(); } catch (e) {}
+          };
+        }
+      }
     };
-  }, [selectedAsset, syncConnectionState]);
+  }, [syncConnectionState]);
 
   const controlIngestion = async (action) => {
     try {
