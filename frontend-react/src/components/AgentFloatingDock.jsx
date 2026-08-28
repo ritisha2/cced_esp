@@ -476,22 +476,21 @@ export const AgentFloatingDock = () => {
                     lineHeight: '1.45',
                     whiteSpace: 'pre-wrap'
                   }}>
-                    {msg.status && (
+                    {!msg.text ? (
                       <div style={{
-                        fontSize: '0.72rem',
-                        color: 'var(--accent-cyan)',
-                        fontWeight: '600',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '6px',
-                        marginBottom: '6px',
-                        fontFamily: 'var(--font-mono)'
+                        padding: '6px 4px'
                       }}>
-                        <Activity size={12} className="live-pulse" />
-                        <span>{msg.status}</span>
+                        <RefreshCw size={14} className="live-pulse" color="var(--primary)" />
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                          Processing...
+                        </span>
                       </div>
+                    ) : (
+                      msg.text
                     )}
-                    {msg.text}
 
                     {msg.actionCard && (
                       <div style={{
