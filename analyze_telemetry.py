@@ -1,7 +1,16 @@
 import sqlite3
 import json
+from pathlib import Path
 
-conn = sqlite3.connect('data/opg_wells.db')
+BASE_DIR = Path(__file__).resolve().parent
+DB_PATH = BASE_DIR / 'data' / 'opg_wells.db'
+if not DB_PATH.exists():
+    # Fallback to labelled or unlabelled db
+    DB_PATH = BASE_DIR / 'data' / 'labelled.db'
+    if not DB_PATH.exists():
+        DB_PATH = BASE_DIR / 'data' / 'unlabelled.db'
+
+conn = sqlite3.connect(str(DB_PATH))
 cursor = conn.cursor()
 
 print("=== 1. SCENARIOS DETECTED IN DATASET ===")

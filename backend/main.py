@@ -1,3 +1,4 @@
+import sys
 import asyncio
 import json
 import logging
@@ -7,13 +8,16 @@ from pathlib import Path
 from typing import List, Optional, Set
 from contextlib import asynccontextmanager
 
+from backend.config import BASE_DIR, DEFAULT_MQTT_CONFIG, DEFAULT_INGESTION_STATE, MQTTConfig, IngestionState
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from backend.config import BASE_DIR, DEFAULT_MQTT_CONFIG, DEFAULT_INGESTION_STATE, MQTTConfig, IngestionState
 from backend.database import db, labelled_db, unlabelled_db, get_database
 from backend.mqtt_collector import MQTTCollector
 from backend.database_ml import ml_db
@@ -138,9 +142,11 @@ async def lifespan(app: FastAPI):
 
 from backend.api.validation_routes import validation_router
 from backend.api.learning_routes import learning_router
+from backend.api.historian_routes import historian_router
 
 app = FastAPI(title="OPG Wells Telemetry & ESP Intelligence Platform", lifespan=lifespan)
 app.include_router(esp_router)
+app.include_router(historian_router)
 app.include_router(replay_router)
 app.include_router(validation_router)
 app.include_router(learning_router)

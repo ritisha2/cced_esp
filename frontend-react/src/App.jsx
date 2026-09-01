@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TelemetryProvider } from './context/TelemetryContext';
 import { Header } from './components/Header';
 import { SystemSummary } from './components/SystemSummary';
@@ -20,10 +20,27 @@ import { GlobalStatusBar } from './components/GlobalStatusBar';
 import { AgentFloatingDock } from './components/AgentFloatingDock';
 import { SqliteBrowserModal } from './components/SqliteBrowserModal';
 import { AssetDeepDiveModal } from './components/AssetDeepDiveModal';
+import { useTelemetry } from './context/TelemetryContext';
 import './styles/theme.css';
 
 function ESPDashboard() {
   const [isSqliteModalOpen, setIsSqliteModalOpen] = useState(false);
+  const { setActiveModalAsset } = useTelemetry();
+
+  useEffect(() => {
+    const handleOpenSqlite = () => setIsSqliteModalOpen(true);
+    const handleOpenAsset = (e) => {
+      if (e.detail?.asset) {
+        setActiveModalAsset(e.detail.asset);
+      }
+    };
+    window.addEventListener('open-sqlite-explorer', handleOpenSqlite);
+    window.addEventListener('open-asset-deepdive', handleOpenAsset);
+    return () => {
+      window.removeEventListener('open-sqlite-explorer', handleOpenSqlite);
+      window.removeEventListener('open-asset-deepdive', handleOpenAsset);
+    };
+  }, [setActiveModalAsset]);
 
   return (
     <div className="page-container">

@@ -1,6 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useTelemetry } from '../context/TelemetryContext';
 import { agentApi } from '../services/agentApi';
+import { AgentMarkdownRenderer } from './AgentMarkdownRenderer';
+import { GenerativeChartBlock } from './GenerativeChartBlock';
+import { AgentResponseDeck } from './AgentResponseDeck';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Bot,
   Maximize2,
@@ -13,7 +17,8 @@ import {
   Sparkles,
   CheckCircle2,
   AlertTriangle,
-  RefreshCw
+  RefreshCw,
+  Download
 } from 'lucide-react';
 
 export const AgentFloatingDock = () => {
@@ -132,23 +137,32 @@ export const AgentFloatingDock = () => {
           );
         } else if (evt.type === 'advisory') {
           const adv = evt.advisory;
-          if (adv?.recommended_action) {
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === agentMsgId
-                  ? {
-                      ...msg,
-                      actionCard: {
-                        title: adv.recommended_action.action_title,
-                        urgency: adv.recommended_action.urgency || 'MEDIUM',
-                        confidence: adv.confidence_score || 0.85
-                      }
-                    }
-                  : msg
-              )
-            );
-          }
-        } else if (evt.type === 'generative_ui' && evt.kind === 'plotly_chart') {
+          const evList = adv?.evidence || [];
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === agentMsgId
+                ? {
+                    ...msg,
+                    evidence: evList,
+                    actionCard: adv?.recommended_action ? {
+                      title: adv.recommended_action.action_title,
+                      urgency: adv.recommended_action.urgency || 'MEDIUM',
+                      confidence: adv.confidence_score || 0.85
+                    } : (adv?.recommendation ? {
+                      title: adv.recommendation,
+                      urgency: 'HIGH',
+                      confidence: adv.confidence || 0.9
+                    } : msg.actionCard)
+                  }
+                : msg
+            )
+          );
+        } else if (evt.type === 'generative_ui') {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === agentMsgId ? { ...msg, chart: evt } : msg
+            )
+          );
           setCanvasArtifacts((prev) => [
             {
               id: evt.chart_id || `art-${Date.now()}`,
@@ -178,6 +192,23 @@ export const AgentFloatingDock = () => {
       );
       setIsLoading(false);
     });
+  };
+
+  const handleExportLog = () => {
+    if (messages.length === 0) return;
+    const exportData = {
+      exportTime: new Date().toISOString(),
+      assetId: selectedAsset || 'FS-010',
+      messages,
+      canvasArtifacts
+    };
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `agent_jane_session_${selectedAsset || 'log'}_${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleClearChat = () => {
@@ -272,27 +303,32 @@ export const AgentFloatingDock = () => {
       )}
 
       {/* ─── Compact Floating Window (Default Mode) ─── */}
-      {isOpen && !isExpanded && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: '24px',
-            right: '24px',
-            width: '460px',
-            height: '620px',
-            maxHeight: '88vh',
-            maxWidth: '94vw',
-            backgroundColor: 'var(--bg-card)',
-            border: '1px solid var(--border-color)',
-            borderRadius: '14px',
-            boxShadow: 'var(--shadow-card)',
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-            transition: 'all 0.25s ease-out',
-            zIndex: 9999
-          }}
-        >
+      <AnimatePresence>
+        {isOpen && !isExpanded && (
+          <motion.div
+            key="compact-dock"
+            initial={{ opacity: 0, scale: 0.94, y: 16 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.94, y: 16 }}
+            transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+            style={{
+              position: 'fixed',
+              bottom: '24px',
+              right: '24px',
+              width: '460px',
+              height: '620px',
+              maxHeight: '88vh',
+              maxWidth: '94vw',
+              backgroundColor: 'var(--bg-card)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '14px',
+              boxShadow: 'var(--shadow-card)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              zIndex: 9999
+            }}
+          >
           {/* Minimal Header */}
           <div style={{
             padding: '12px 16px',
@@ -340,14 +376,24 @@ export const AgentFloatingDock = () => {
             {/* Minimal Header Actions */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               {messages.length > 0 && (
-                <button
-                  onClick={handleClearChat}
-                  title="Clear Chat"
-                  className="scada-btn"
-                  style={{ padding: '4px 8px', fontSize: '0.72rem' }}
-                >
-                  <Trash2 size={13} />
-                </button>
+                <>
+                  <button
+                    onClick={handleExportLog}
+                    title="Export Session Log (JSON)"
+                    className="scada-btn"
+                    style={{ padding: '4px 8px', fontSize: '0.72rem' }}
+                  >
+                    <Download size={13} />
+                  </button>
+                  <button
+                    onClick={handleClearChat}
+                    title="Clear Chat"
+                    className="scada-btn"
+                    style={{ padding: '4px 8px', fontSize: '0.72rem' }}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </>
               )}
               <button
                 onClick={() => setIsExpanded(true)}
@@ -470,17 +516,32 @@ export const AgentFloatingDock = () => {
                 ) : (
                   <div style={{
                     alignSelf: 'flex-start',
-                    maxWidth: '92%',
+                    width: '100%',
+                    maxWidth: '98%',
                     background: 'var(--bg-card)',
                     border: '1px solid var(--border-color)',
-                    padding: '10px 12px',
+                    padding: '8px 10px',
                     borderRadius: '2px 12px 12px 12px',
-                    fontSize: '0.8rem',
+                    fontSize: '0.82rem',
                     color: 'var(--text-primary)',
                     fontFamily: 'var(--font-sans)',
-                    lineHeight: '1.45',
-                    whiteSpace: 'pre-wrap'
+                    lineHeight: '1.5'
                   }}>
+                    {msg.status && (
+                      <div style={{
+                        fontSize: '0.72rem',
+                        color: 'var(--accent-cyan)',
+                        fontWeight: '600',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        marginBottom: '6px',
+                        fontFamily: 'var(--font-mono)'
+                      }}>
+                        <Activity size={12} className="live-pulse" />
+                        <span>{msg.status}</span>
+                      </div>
+                    )}
                     {!msg.text ? (
                       <div style={{
                         display: 'flex',
@@ -490,40 +551,11 @@ export const AgentFloatingDock = () => {
                       }}>
                         <RefreshCw size={14} className="live-pulse" color="var(--primary)" />
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                          Processing...
+                          {msg.status || 'Processing...'}
                         </span>
                       </div>
                     ) : (
-                      msg.text
-                    )}
-
-                    {msg.actionCard && (
-                      <div style={{
-                        marginTop: '10px',
-                        padding: '10px',
-                        background: 'var(--state-warning-bg)',
-                        border: '1px solid var(--state-warning-border)',
-                        borderRadius: '6px',
-                        fontSize: '0.75rem'
-                      }}>
-                        <div style={{ fontWeight: '700', color: 'var(--state-warning-text)', marginBottom: '4px' }}>
-                          ⚡ Recommended Action
-                        </div>
-                        <div style={{ color: 'var(--text-primary)', marginBottom: '6px' }}>
-                          {msg.actionCard.title}
-                        </div>
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '12px',
-                          fontSize: '0.7rem',
-                          color: 'var(--text-muted)',
-                          fontFamily: 'var(--font-mono)'
-                        }}>
-                          <span>Priority: {msg.actionCard.urgency}</span>
-                          <span>Confidence: {Math.round(msg.actionCard.confidence * 100)}%</span>
-                        </div>
-                      </div>
+                      <AgentResponseDeck message={msg} />
                     )}
                   </div>
                 )}
@@ -561,28 +593,34 @@ export const AgentFloatingDock = () => {
               <Send size={14} />
             </button>
           </div>
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
       {/* ─── EXPANDED RESIZABLE SLIDER VIEW ─── */}
-      {isOpen && isExpanded && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            right: 0,
-            bottom: 0,
-            width: `${panelWidth}px`,
-            backgroundColor: 'var(--bg-card)',
-            borderLeft: '1px solid var(--border-color)',
-            boxShadow: 'var(--shadow-card)',
-            zIndex: 99999,
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-            transition: isResizing ? 'none' : 'width 0.15s ease-out'
-          }}
-        >
+      <AnimatePresence>
+        {isOpen && isExpanded && (
+          <motion.div
+            key="expanded-dock"
+            initial={{ opacity: 0, x: 40 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 40 }}
+            transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+            style={{
+              position: 'fixed',
+              top: 0,
+              right: 0,
+              bottom: 0,
+              width: `${panelWidth}px`,
+              backgroundColor: 'var(--bg-card)',
+              borderLeft: '1px solid var(--border-color)',
+              boxShadow: 'var(--shadow-card)',
+              zIndex: 99999,
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden'
+            }}
+          >
           {/* Drag Resize Handle */}
           <div
             onMouseDown={startResizing}
@@ -634,6 +672,26 @@ export const AgentFloatingDock = () => {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {messages.length > 0 && (
+                <>
+                  <button
+                    onClick={handleExportLog}
+                    title="Export Session Log (JSON)"
+                    className="scada-btn"
+                    style={{ padding: '4px 8px', fontSize: '0.72rem' }}
+                  >
+                    <Download size={13} />
+                  </button>
+                  <button
+                    onClick={handleClearChat}
+                    title="Clear Chat"
+                    className="scada-btn"
+                    style={{ padding: '4px 8px', fontSize: '0.72rem' }}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </>
+              )}
               <button
                 onClick={() => setIsExpanded(false)}
                 title="Collapse to Window"
@@ -699,13 +757,13 @@ export const AgentFloatingDock = () => {
                     maxWidth: '94%',
                     background: 'var(--bg-card)',
                     border: '1px solid var(--border-color)',
-                    padding: '12px',
+                    padding: '14px 16px',
                     borderRadius: '2px 12px 12px 12px',
-                    fontSize: '0.8rem',
+                    fontSize: '0.82rem',
                     color: 'var(--text-primary)',
-                    lineHeight: '1.45',
-                    whiteSpace: 'pre-wrap'
+                    lineHeight: '1.5'
                   }}>
+                    {/* Status indicator */}
                     {msg.status && (
                       <div style={{
                         fontSize: '0.72rem',
@@ -714,14 +772,24 @@ export const AgentFloatingDock = () => {
                         display: 'flex',
                         alignItems: 'center',
                         gap: '6px',
-                        marginBottom: '6px',
+                        marginBottom: '8px',
                         fontFamily: 'var(--font-mono)'
                       }}>
                         <Activity size={12} className="live-pulse" />
                         <span>{msg.status}</span>
                       </div>
                     )}
-                    {msg.text}
+
+                    {!msg.text ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 0' }}>
+                        <RefreshCw size={14} className="live-pulse" color="var(--primary)" />
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                          {msg.status || 'Processing...'}
+                        </span>
+                      </div>
+                    ) : (
+                      <AgentResponseDeck message={msg} />
+                    )}
                   </div>
                 )}
               </div>
@@ -754,8 +822,9 @@ export const AgentFloatingDock = () => {
               <Send size={14} />
             </button>
           </div>
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
     </div>
   );
 };
