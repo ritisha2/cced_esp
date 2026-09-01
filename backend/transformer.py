@@ -3,14 +3,161 @@ OPG & ESP Wells Telemetry Data Transformer
 Transforms incoming live MQTT telemetry into:
 1. LABELLED Dataset (complete ground truth with Scenario/Fault, Alarms, Alerts, Operating State, Trip Cause)
 2. UNLABELLED Dataset (pure sensor parameter time-series stripped of all fault/anomaly labels)
+
+Also provides extract_vfd_signals() — an ADDITIVE mapping layer that resolves the raw MQTT
+payload into the 14 VFD parameter names consumed by ESP_APM_models.WellDiagnosticEngine.
+This does not replace or alter transform_mqtt_payload()/create_unlabelled_from_labelled();
+the old-schema DB write path above is untouched. See vfd_diagnostic_service.py for the caller.
 """
 
+import os
+import sys
 import json
 import logging
 from datetime import datetime, timezone
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, Optional
 
 logger = logging.getLogger("opg_transformer")
+
+# -- Make ESP_APM_models importable (workspace root is two levels above cced_esp/backend) ---
+_WORKSPACE_ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+if _WORKSPACE_ROOT not in sys.path:
+    sys.path.insert(0, _WORKSPACE_ROOT)
+
+try:
+    from ESP_APM_models.calibration_registry import STANDARD_SENSORS, clean_col_key
+    _VFD_MODELS_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"[transformer] ESP_APM_models not importable, extract_vfd_signals will no-op: {e}")
+    STANDARD_SENSORS = []
+    clean_col_key = None
+    _VFD_MODELS_AVAILABLE = False
+
+
+# Known legacy/alternate field-name aliases -> canonical VFD sensor name. Checked BEFORE the
+# generic clean_col_key() fuzzy pass below, since several legacy SCADA tags (R_PIT_001/002/003,
+# R_DRV_CURR_AVG, R_BUS_IN_VTG_AVG) don't contain a substring clean_col_key recognizes.
+_VFD_ALIAS_MAP: Dict[str, list] = {
+    "Inp bar/psi":        ["intake_pressure_psi", "intake_pressure", "intake_p", "R_INTAKE_PRESS", "pip"],
+    "Int temp °C":         ["intake_temperature_c", "intake_temp", "R_INTAKE_TEMP"],
+    "Motor temp °C":       ["motor_temperature_c", "motor_temperature", "temperature_c", "R_MOTOR_TEMP"],
+    "Disch pr. Bar/psi":  ["discharge_pressure_psi", "discharge_pressure", "discharge_p", "pressure_psi", "R_DISCH_PRESS", "pdp"],
+    "Vibration G's-Vx":   ["vibration_g", "vibration_g_rms", "vibration_rms", "vibration", "R_VIBRATION_X"],
+    "Leak Current Ct":    ["leak_current", "leakage_current", "insulation_current"],
+    "Volt":               ["motor_voltage_v", "motor_voltage", "voltage", "R_BUS_IN_VTG_AVG", "volts"],
+    "VSD Amps/Load":      ["motor_current_a", "motor_current", "current", "R_DRV_CURR_AVG", "amps", "vsd_amps", "drive_current"],
+    "Frequency":          ["frequency_hz", "frequency", "freq", "R_FREQUENCY"],
+    "DHG Current":        ["dhg_current", "R_DHG_CURR_AVG", "downhole_gauge_current"],
+    "WHP (PSI)":          ["wellhead_pressure_psi", "whp_psi", "whp", "R_PIT_001"],
+    "FLP (PSI)":          ["flowline_pressure_psi", "flp_psi", "flp", "R_PIT_003"],
+    "AP (PSI)":           ["casing_pressure_psi", "annulus_pressure_psi", "ap_psi", "ap", "R_PIT_002"],
+}
+
+# VFD STS is a run-status flag, not a STANDARD_SENSORS channel — resolved separately below,
+# including string-state normalization (e.g. operating_state="tripped" -> 0).
+_VFD_STS_ALIASES = ["VFD STS", "vfd_sts", "vfd_status", "run_status", "status_flag"]
+_VFD_STS_RUNNING_STATES = {"running", "normal", "active", "on"}
+_VFD_STS_STOPPED_STATES = {"tripped", "stopped", "off", "shut_in", "shutdown"}
+
+
+def _coerce_float(v: Any) -> Optional[float]:
+    """Best-effort float coercion; returns None (not a synthetic default) if it fails."""
+    if v is None:
+        return None
+    if isinstance(v, dict):
+        v = v.get("value")
+    try:
+        s = str(v).strip()
+        return float(s) if s != "" else None
+    except (ValueError, TypeError):
+        return None
+
+
+def _resolve_vfd_sts(meas: Dict[str, Any], top_level: Dict[str, Any]) -> Optional[float]:
+    """
+    Resolve VFD STS with priority:
+      1. Known explicit aliases (exact key match)
+      2. Fuzzy clean_col_key() pass — catches broker field names not in the alias list
+         but that clean_col_key already recognizes (any key containing "vfd"/"sts"/"status").
+         VFD STS is NOT in STANDARD_SENSORS, so it is excluded from extract_vfd_signals()'s
+         main fuzzy loop — this is the fuzzy-match path for VFD STS specifically.
+      3. Fall back to the labelled/raw operating_state string (e.g. "running" / "tripped")
+         — a soft heuristic, only used if the broker sends no run-status signal at all.
+    """
+    for alias in _VFD_STS_ALIASES:
+        if alias in meas:
+            f = _coerce_float(meas[alias])
+            if f is not None:
+                return f
+
+    if clean_col_key is not None:
+        for raw_key, raw_val in meas.items():
+            if clean_col_key(raw_key) == "VFD STS":
+                f = _coerce_float(raw_val)
+                if f is not None:
+                    return f
+
+    state = str(top_level.get("operating_state") or top_level.get("state") or "").strip().lower()
+    if state in _VFD_STS_RUNNING_STATES:
+        return 1.0
+    if state in _VFD_STS_STOPPED_STATES:
+        return 0.0
+    return None
+
+
+def extract_vfd_signals(data: Dict[str, Any]) -> Dict[str, float]:
+    """
+    Resolves the raw MQTT payload dict into whatever subset of the 14 VFD parameter
+    names (STANDARD_SENSORS + "VFD STS") it can find, using:
+      1. Known legacy alias lookup (R_* SCADA tags, old snake_case DB names)
+      2. ESP_APM_models.clean_col_key() fuzzy substring matching (covers literal VFD
+         names already, e.g. if the payload already uses "Inp bar/psi" directly)
+
+    Only sensors actually resolved are included in the returned dict — unresolved
+    sensors are intentionally omitted (not defaulted here) so that
+    WellDiagnosticEngine's own calibrated-median fill (see normalize_live_telemetry)
+    supplies a well-appropriate fallback instead of an arbitrary constant.
+    """
+    if not _VFD_MODELS_AVAILABLE:
+        return {}
+
+    meas = (
+        data.get("telemetry") if isinstance(data.get("telemetry"), dict)
+        else data.get("measurements") if isinstance(data.get("measurements"), dict)
+        else data.get("data") if isinstance(data.get("data"), dict)
+        else data
+    )
+    resolved: Dict[str, float] = {}
+
+    for canonical, aliases in _VFD_ALIAS_MAP.items():
+        val = None
+        for alias in aliases:
+            if alias in meas:
+                val = _coerce_float(meas[alias])
+                if val is not None:
+                    break
+        resolved[canonical] = val
+
+    # Fuzzy pass: for any STANDARD_SENSOR not yet resolved, scan all payload keys through
+    # clean_col_key() in case the payload already carries the literal/near-literal VFD name.
+    unresolved = [s for s in STANDARD_SENSORS if resolved.get(s) is None]
+    if unresolved:
+        for raw_key, raw_val in meas.items():
+            ck = clean_col_key(raw_key)
+            if ck in unresolved:
+                f = _coerce_float(raw_val)
+                if f is not None:
+                    resolved[ck] = f
+                    unresolved.remove(ck)
+
+    # Drop any sensor that was never resolved (let the engine's median-fill handle it)
+    resolved = {k: v for k, v in resolved.items() if v is not None}
+
+    vfd_sts = _resolve_vfd_sts(meas, data)
+    if vfd_sts is not None:
+        resolved["VFD STS"] = vfd_sts
+
+    return resolved
 
 def normalize_sensor_value(val: Any, default: float = 0.0) -> float:
     """Safely convert any sensor reading to float."""
