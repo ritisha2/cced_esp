@@ -864,7 +864,7 @@ async def get_asset_health_index(asset_id: str = FPath(...)):
     anom_score = assessment.anomaly.anomaly_score if (assessment and hasattr(assessment, "anomaly") and assessment.anomaly) else 0.05
     fault_cls = getattr(assessment, "fault_name", "Normal") if assessment else "Normal"
     
-    hi = health_predictor.predict(latest_row, anomaly_score=anom_score, fault_class=fault_cls)
+    hi = health_predictor.predict(latest_row, anomaly_score=anom_score, fault_class=fault_cls, well_id=asset_id)
     return {
         "status": "success",
         "asset_id": asset_id,

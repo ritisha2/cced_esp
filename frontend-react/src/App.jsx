@@ -10,10 +10,6 @@ import { OperatingEnvelope } from './components/OperatingEnvelope';
 import { SynchronizedTrends } from './components/SynchronizedTrends';
 import { Param13GraphsSection } from './components/Param13Graphs/Param13GraphsSection';
 import { PumpPerformanceCurve } from './components/PumpPerformanceCurve';
-import { SetpointConfigSection } from './components/SetpointConfigSection';
-import { ProfitabilityTable } from './components/ProfitabilityTable';
-import { ReplaySection } from './components/ReplaySection';
-import { MultiAssetVersusSection } from './components/MultiAssetVersusSection';
 import { FleetHealthGrid } from './components/FleetHealthGrid';
 import { DatabaseExportControls } from './components/DatabaseExportControls';
 import { GlobalStatusBar } from './components/GlobalStatusBar';
@@ -44,27 +40,27 @@ function ESPDashboard() {
 
   return (
     <div className="page-container">
-      {/* 1. Header & Navigation */}
+      {/* 1. Header & Quick Navigation */}
       <Header onOpenSqliteModal={() => setIsSqliteModalOpen(true)} />
 
-      {/* Main Single Continuous Scrollable Operations Center */}
+      {/* Main Continuous Operations Center */}
       <main className="content-section">
         {/* 2. System Summary KPI Strip */}
         <SystemSummary />
 
         <div className="section-divider" />
 
-        {/* 3. MQTT Live Ingestion & Pipeline Controls */}
+        {/* 3. MQTT Live Ingestion & Telemetry Simulator Controls */}
         <IngestionControls />
 
         <div className="section-divider" />
 
-        {/* 4. Live Telemetry Data Stream Matrix (with Flow [BPD] & Controls) */}
+        {/* 4. Live Telemetry Data Stream Matrix (14 VFD Signal Channels) */}
         <LiveTelemetryTable />
 
         <div className="section-divider" />
 
-        {/* 5. Active Diagnosis & Health Assessment (with Health Index in Big Font) */}
+        {/* 5. Active Diagnosis & 13-Mode Fault Assessment (ESP_APM_models Engine) */}
         <DiagnosisBanner />
 
         <div className="section-divider" />
@@ -74,7 +70,7 @@ function ESPDashboard() {
 
         <div className="section-divider" />
 
-        {/* 7. ESP Operating Envelope & Boundary Monitoring */}
+        {/* 7. ESP Operating Envelope & Statistical Boundary Monitoring (P10–P90) */}
         <OperatingEnvelope />
 
         <div className="section-divider" />
@@ -84,56 +80,38 @@ function ESPDashboard() {
 
         <div className="section-divider" />
 
-        {/* 9. 13 Standard Engineering Telemetry Streams (with Delta Cards & VSD Advisor) */}
+        {/* 9. 13 Standard Engineering Telemetry Streams & AI VSD Frequency Advisor */}
         <Param13GraphsSection />
 
-        {/* 10. Pump Performance Curve (H-Q & Power BEP Envelope) */}
+        <div className="section-divider" />
+
+        {/* 10. Pump Performance Curve (H-Q & Power Envelope) */}
         <PumpPerformanceCurve />
 
         <div className="section-divider" />
 
-        {/* 11. Operator Setpoint Tuning & Dynamic Alarm Thresholds */}
-        <SetpointConfigSection />
-
-        <div className="section-divider" />
-
-        {/* 12. ESP Fleet Production Economics & Daily Profitability Table */}
-        <ProfitabilityTable />
-
-        <div className="section-divider" />
-
-        {/* 13. Historical Event & Failure Scenario Replay Engine */}
-        <ReplaySection />
-
-        <div className="section-divider" />
-
-        {/* 14. Multi-Asset Orchestration & Live Versus Comparative Trends */}
-        <MultiAssetVersusSection />
-
-        <div className="section-divider" />
-
-        {/* 15. ESP Fleet Well Health Overview & 26 Asset Registry */}
+        {/* 11. ESP Fleet Well Health Overview & 73 Asset Registry */}
         <FleetHealthGrid />
 
         <div className="section-divider" />
 
-        {/* 16. Telemetry Database Storage & Analytical Export */}
+        {/* 12. Telemetry Database Storage & Analytical Export */}
         <DatabaseExportControls />
       </main>
 
-      {/* 17. Global Status Bar & Diagnostics Footer */}
+      {/* 13. Global Status Bar & Diagnostics Footer */}
       <GlobalStatusBar />
 
-      {/* 18. Floating AI Agent Dock */}
+      {/* 14. Floating AI Agent Workspace (Agent Jane — 3-Tab Deck & Level A-F Evidence) */}
       <AgentFloatingDock />
 
-      {/* 19. Floating SQLite Dual Database Modal */}
+      {/* 15. Floating SQLite Dual Database Modal */}
       <SqliteBrowserModal
         isOpen={isSqliteModalOpen}
         onClose={() => setIsSqliteModalOpen(false)}
       />
 
-      {/* 20. Floating Glassmorphic Asset Deep-Dive Window */}
+      {/* 16. Floating Glassmorphic Asset Deep-Dive Window */}
       <AssetDeepDiveModal />
     </div>
   );
@@ -146,3 +124,4 @@ export default function App() {
     </TelemetryProvider>
   );
 }
+

@@ -2,7 +2,6 @@ import React from 'react';
 import { useTelemetry } from '../../context/TelemetryContext';
 import { PARAM_CONFIGS } from '../../constants/telemetryTags';
 import { ParameterChartCard } from './ParameterChartCard';
-import { DeltaStabilityCards } from '../DeltaStabilityCards';
 import { VsdAdvisorCard } from '../VsdAdvisorCard';
 import { LineChart, RefreshCw } from 'lucide-react';
 
@@ -13,9 +12,6 @@ export const Param13GraphsSection = () => {
   return (
     <section id="section-graphs">
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        {/* Real-Time Delta & Stability Metric Cards (matching uploaded screenshot) */}
-        <DeltaStabilityCards />
-
         {/* Header Bar for 13 Parameter Streams */}
         <div style={{
           display: 'flex',

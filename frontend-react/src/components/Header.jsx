@@ -23,16 +23,14 @@ export const Header = ({ onOpenSqliteModal }) => {
   const navLinks = [
     { label: 'Summary', href: '#section-summary' },
     { label: 'Controls', href: '#section-controls' },
-    { label: 'Live Data', href: '#section-telemetry' },
+    { label: 'Live Telemetry', href: '#section-telemetry' },
     { label: 'Diagnosis', href: '#section-diagnosis' },
-    { label: 'ESP View', href: '#section-schematic' },
+    { label: 'Wellbore View', href: '#section-schematic' },
     { label: 'Envelope', href: '#section-envelope' },
     { label: 'Trends', href: '#section-trends' },
     { label: '13-Graphs', href: '#section-graphs' },
     { label: 'Pump Curve', href: '#section-pump-curve' },
-    { label: 'Economics', href: '#section-economics' },
-    { label: 'Versus', href: '#section-versus' },
-    { label: 'Fleet', href: '#section-fleet' },
+    { label: 'Fleet Grid', href: '#section-fleet' },
   ];
 
   return (
