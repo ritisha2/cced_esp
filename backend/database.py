@@ -38,14 +38,14 @@ class Database:
                     scenario TEXT DEFAULT 'normal',          -- scenario name (e.g. normal, undervoltage, gas_interference)
                     alarms TEXT DEFAULT '[]',                -- JSON list of alarms
                     alerts TEXT DEFAULT '[]',                -- JSON list of alerts
-                    pressure_psi REAL DEFAULT 0.0,            -- Discharge Pressure (PSI)
-                    intake_pressure_psi REAL DEFAULT 0.0,     -- Intake Pressure (PSI)
-                    temperature_c REAL DEFAULT 0.0,           -- Motor / Well Temperature (°C)
+                    pressure_psi REAL DEFAULT 0.0,            -- Discharge Pressure legacy alias (PSI)
+                    intake_pressure_psi REAL DEFAULT 0.0,     -- Inp bar/psi (PSI)
+                    temperature_c REAL DEFAULT 0.0,           -- Legacy temperature alias (°C)
                     flow_rate_bpd REAL DEFAULT 0.0,           -- Liquid Flow Rate (BPD)
-                    frequency_hz REAL DEFAULT 0.0,            -- Motor Frequency (Hz)
-                    motor_current_a REAL DEFAULT 0.0,         -- Motor Current (A)
-                    motor_voltage_v REAL DEFAULT 0.0,         -- Motor Voltage (V)
-                    vibration_g REAL DEFAULT 0.0,             -- Pump Vibration (g)
+                    frequency_hz REAL DEFAULT 0.0,            -- Frequency (Hz)
+                    motor_current_a REAL DEFAULT 0.0,         -- VSD Amps/Load (A)
+                    motor_voltage_v REAL DEFAULT 0.0,         -- Volt (V)
+                    vibration_g REAL DEFAULT 0.0,             -- Vibration G's-Vx (g)
                     water_cut_pct REAL DEFAULT 0.0,           -- Water Cut %
                     gas_flow_mscfd REAL DEFAULT 0.0,
                     choke_size_pct REAL DEFAULT 0.0,
@@ -53,9 +53,20 @@ class Database:
                     trip_cause TEXT DEFAULT '',               -- e.g. UNDER_VOLTAGE, GAS_LOCK_UNDERLOAD
                     status TEXT DEFAULT 'NORMAL',             -- NORMAL, WARNING, CRITICAL, UNLABELLED
                     raw_payload TEXT DEFAULT '{}',
-                    created_at TEXT DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW'))
+                    created_at TEXT DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
+                    -- ── Native 14-parameter VFD columns (added for new broker schema) ──
+                    discharge_pressure_psi REAL DEFAULT NULL, -- Disch pr. Bar/psi
+                    intake_temperature_c REAL DEFAULT NULL,   -- Int temp °C
+                    motor_temperature_c REAL DEFAULT NULL,    -- Motor temp °C
+                    whp_psi REAL DEFAULT NULL,                -- WHP (PSI)
+                    flp_psi REAL DEFAULT NULL,                -- FLP (PSI)
+                    annulus_pressure_psi REAL DEFAULT NULL,   -- AP (PSI) — 14th parameter
+                    leak_current_ct REAL DEFAULT NULL,        -- Leak Current Ct
+                    dhg_current REAL DEFAULT NULL,            -- DHG Current
+                    vfd_status INTEGER DEFAULT NULL           -- VFD STS (1=Running, 0=Stopped)
                 );
             """)
+
 
             # Add any missing columns dynamically if upgrading existing table
             existing_cols = []

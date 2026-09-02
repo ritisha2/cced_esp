@@ -288,6 +288,26 @@ def transform_mqtt_payload(data: Dict[str, Any], topic: str) -> Tuple[Dict[str, 
     gas_flow = normalize_sensor_value(meas.get("gas_flow_mscfd") or meas.get("gas_rate"))
     choke_pct = normalize_sensor_value(meas.get("choke_size_64ths") or meas.get("choke_size_pct"))
 
+    # 3b. Extract native 14-parameter VFD columns using canonical VFD signal resolver.
+    #     Returns only signals that were actually resolved; unresolved keys are absent (→ None in DB).
+    vfd_signals = extract_vfd_signals(data)
+    # Map canonical VFD names → new native SQL column names
+    _VFD_COL_MAP = {
+        "Disch pr. Bar/psi":  "discharge_pressure_psi",
+        "Int temp °C":        "intake_temperature_c",
+        "Motor temp °C":      "motor_temperature_c",
+        "WHP (PSI)":          "whp_psi",
+        "FLP (PSI)":          "flp_psi",
+        "AP (PSI)":           "annulus_pressure_psi",
+        "Leak Current Ct":    "leak_current_ct",
+        "DHG Current":        "dhg_current",
+        "VFD STS":            "vfd_status",
+    }
+    native_vfd_cols: Dict[str, Any] = {}
+    for canonical, sql_col in _VFD_COL_MAP.items():
+        v = vfd_signals.get(canonical)
+        native_vfd_cols[sql_col] = int(v) if sql_col == "vfd_status" and v is not None else v
+
     # 4. Extract Timestamp
     ts_str = data.get("timestamp") or data.get("time") or datetime.now(timezone.utc).isoformat()
 
@@ -311,7 +331,7 @@ def transform_mqtt_payload(data: Dict[str, Any], topic: str) -> Tuple[Dict[str, 
     else:
         status = "NORMAL"
 
-    # Build LABELLED record
+    # Build LABELLED record (includes native VFD columns)
     labelled_record = {
         "timestamp": ts_str,
         "asset_id": asset_id_str,
@@ -335,7 +355,9 @@ def transform_mqtt_payload(data: Dict[str, Any], topic: str) -> Tuple[Dict[str, 
         "operating_state": operating_state,
         "trip_cause": trip_cause,
         "status": status,
-        "raw_payload": json.dumps(data)
+        "raw_payload": json.dumps(data),
+        # ── Native 14-parameter VFD columns ──────────────────────────────
+        **native_vfd_cols,
     }
 
     # Pass through single transformer function to create the unlabelled counterpart
