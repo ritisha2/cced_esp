@@ -86,6 +86,20 @@ class Database:
                 ("vibration_g", "REAL DEFAULT 0.0"),
                 ("operating_state", "TEXT DEFAULT 'running'"),
                 ("trip_cause", "TEXT DEFAULT ''"),
+                # ── Native 14-parameter VFD columns (broker schema) ──
+                # Present in CREATE TABLE above for fresh DBs, but older databases
+                # (e.g. labelled.db) predate them; list here so init_db() self-heals
+                # any existing table via idempotent ADD COLUMN. DEFAULT NULL preserves
+                # every existing row untouched.
+                ("discharge_pressure_psi", "REAL DEFAULT NULL"),
+                ("intake_temperature_c", "REAL DEFAULT NULL"),
+                ("motor_temperature_c", "REAL DEFAULT NULL"),
+                ("whp_psi", "REAL DEFAULT NULL"),
+                ("flp_psi", "REAL DEFAULT NULL"),
+                ("annulus_pressure_psi", "REAL DEFAULT NULL"),
+                ("leak_current_ct", "REAL DEFAULT NULL"),
+                ("dhg_current", "REAL DEFAULT NULL"),
+                ("vfd_status", "INTEGER DEFAULT NULL"),
             ]
             for col_name, col_def in new_columns:
                 if col_name not in existing_cols:

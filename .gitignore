@@ -54,3 +54,5 @@ Thumbs.db
 attachments.zip
 scratch/
 *.log
+
+data/logs/
