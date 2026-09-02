@@ -4,6 +4,12 @@ Tier 1: ISO 10816 / Critical Physical Limits Evaluation Layer
 Tier 2: Dual ML Classifier (XGBoost) & Unsupervised Anomaly Detector (IsolationForest)
 
 Outputs strictly standardized prediction dictionaries according to specification.
+
+NOTE (2026-09-01): This engine's fault taxonomy is legacy/experimental and conflicts
+with ESP_APM_models, the sole source of truth for LIVE ESP fault classification.
+Safe to use offline (training/testing, via pipeline_runner.py --train/--fetch/--test-sample
+or test_production_pipeline.py) — just never wire this into the live MQTT broker path.
+See cced_esp/backend/services/vfd_diagnostic_service.py for the live pipeline.
 """
 
 import os

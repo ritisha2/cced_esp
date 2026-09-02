@@ -1,4 +1,10 @@
 """
+*** DEPRECATED (2026-09-01) — DO NOT RUN AGAINST THE LIVE BROKER ***
+This module's fault taxonomy conflicts with ESP_APM_models (the sole source
+of truth for live ESP fault classification). It is only reachable via
+`pipeline_runner.py --run --force-legacy-live`, which is disabled by default.
+See cced_esp/backend/services/vfd_diagnostic_service.py for the live pipeline.
+
 Real-Time MQTT Subscriber & Live Detection Engine.
 Subscribes to live ESP field telemetry, executes real-time 2-tier fault classification
 and anomaly detection inference, and publishes predictions to the MQTT broker.

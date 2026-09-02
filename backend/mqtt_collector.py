@@ -8,6 +8,7 @@ import paho.mqtt.client as mqtt
 from backend.config import MQTTConfig, IngestionState
 from backend.database import db, labelled_db, unlabelled_db
 from backend.transformer import transform_mqtt_payload
+from backend.services.vfd_diagnostic_service import vfd_diagnostic_service
 
 
 logger = logging.getLogger("opg.mqtt")
@@ -34,6 +35,11 @@ class MQTTCollector:
         import queue
         self.raw_thread_queue = queue.Queue(maxsize=10000)
         self.last_broadcast_time = 0.0
+
+        # Strong references to fire-and-forget VFD diagnostic background tasks —
+        # asyncio.create_task() results MUST be retained or the task can be
+        # garbage-collected mid-execution. Self-removes via done_callback.
+        self._vfd_bg_tasks: Set[asyncio.Task] = set()
         
         # Callbacks for WebSocket broadcasting
         self.broadcast_callback: Optional[Callable[[Dict[str, Any]], Any]] = None
@@ -180,6 +186,42 @@ class MQTTCollector:
         except Exception:
             pass
 
+    async def _run_and_broadcast_vfd_diagnostic(self, payload_data: Dict[str, Any], well_id_hint: Optional[str]):
+        """
+        Runs vfd_diagnostic_service.process() off the event loop thread (CPU-bound model
+        inference), then — if a diagnosis was produced — broadcasts it live over the same
+        WebSocket channel used for LIVE_TELEMETRY, tagged with a distinct message type
+        (VFD_DIAGNOSTIC) so the frontend can distinguish it without touching its existing
+        LIVE_TELEMETRY / ESP_ASSESSMENT / STATUS_UPDATE handling.
+
+        vfd_diagnostic_service.process() already writes the JSONL durability log itself
+        and never raises (errors are logged and swallowed internally) — this wrapper only
+        adds the broadcast step on top, and swallows its own errors too so a WebSocket
+        hiccup can never affect telemetry DB writes or the raw LIVE_TELEMETRY broadcast.
+        """
+        try:
+            result = await asyncio.to_thread(vfd_diagnostic_service.process, payload_data, well_id_hint)
+        except Exception as e:
+            logger.debug(f"[MQTTCollector] VFD diagnostic evaluation failed: {e}")
+            return
+
+        if not result or not self.broadcast_callback:
+            return
+
+        try:
+            await self.broadcast_callback({
+                "type": "VFD_DIAGNOSTIC",
+                "well_id": result.get("well_id"),
+                "family": result.get("family"),
+                "timestamp": result.get("timestamp"),
+                "diagnostic": result.get("diagnostic"),
+                "dynamics": result.get("dynamics"),
+                "ml_anomaly": result.get("ml_anomaly"),
+                "raw_measurements": result.get("raw_measurements"),
+            })
+        except Exception as e:
+            logger.debug(f"[MQTTCollector] VFD diagnostic broadcast failed: {e}")
+
     def _normalize_records(self, data: Dict[str, Any], topic: str) -> tuple[Dict[str, Any], Dict[str, Any]]:
         """
         Pass incoming MQTT payload through dedicated transformer.
@@ -296,6 +338,24 @@ class MQTTCollector:
 
                         latest_labelled = labelled
                         latest_unlabelled = unlabelled
+
+                        # Additive VFD diagnostic bridge: feeds the SAME raw payload_data
+                        # (not the DB-shaped labelled/unlabelled records) through
+                        # ESP_APM_models.WellDiagnosticEngine, appends a JSONL log record
+                        # for the agent to read, AND broadcasts the result live over the
+                        # same WebSocket used for LIVE_TELEMETRY (type: VFD_DIAGNOSTIC) so
+                        # the frontend / any live consumer gets it in real time too.
+                        # Off-loaded to a worker thread so CPU-bound model inference never
+                        # blocks the asyncio event loop. Never allowed to affect DB
+                        # writes/broadcast of telemetry — errors are logged and swallowed.
+                        try:
+                            task = asyncio.create_task(
+                                self._run_and_broadcast_vfd_diagnostic(payload_data, wid or aid)
+                            )
+                            self._vfd_bg_tasks.add(task)
+                            task.add_done_callback(self._vfd_bg_tasks.discard)
+                        except Exception as e:
+                            logger.debug(f"[MQTTCollector] VFD diagnostic dispatch skipped: {e}")
                     except Exception as e:
                         logger.error(f"Error processing item from queue: {e}")
 

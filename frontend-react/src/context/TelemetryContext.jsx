@@ -50,6 +50,9 @@ export const TelemetryProvider = ({ children }) => {
   };
   const [recentRecords, setRecentRecords] = useState([]);
   const [assessment, setAssessment] = useState(null);
+  // VFD_DIAGNOSTIC: live output of ESP_APM_models.WellDiagnosticEngine, broadcast per-well.
+  // Keyed by well_id so multiple wells' latest diagnoses can be held simultaneously.
+  const [vfdDiagnostics, setVfdDiagnostics] = useState({});
   const [envelopeEvaluations, setEnvelopeEvaluations] = useState([]);
   const [historyData, setHistoryData] = useState([]);
   const [timeRange, setTimeRange] = useState('6h');
@@ -268,6 +271,25 @@ export const TelemetryProvider = ({ children }) => {
               return;
             }
 
+            if (msg.type === 'VFD_DIAGNOSTIC' && msg.well_id) {
+              // Live ESP_APM_models.WellDiagnosticEngine output (14-signal VFD model),
+              // distinct from the legacy ESP_ASSESSMENT (old 5-model pipeline) above.
+              setVfdDiagnostics(prev => ({
+                ...prev,
+                [msg.well_id]: {
+                  well_id: msg.well_id,
+                  family: msg.family,
+                  timestamp: msg.timestamp,
+                  diagnostic: msg.diagnostic || {},
+                  dynamics: msg.dynamics || {},
+                  ml_anomaly: msg.ml_anomaly || {},
+                  raw_measurements: msg.raw_measurements || {},
+                  received_at: new Date().toISOString(),
+                },
+              }));
+              return;
+            }
+
             if (msg.type === 'LIVE_TELEMETRY' && msg.data) {
               const rawData = msg.data;
               const msgWell = rawData.well_id || rawData.asset_id;
@@ -420,6 +442,7 @@ export const TelemetryProvider = ({ children }) => {
       isConnected, mqttStatus, systemStatus, ingestionState,
       mqttConfig, applyMqttConfig, disconnectMqtt, toggleIngestion, controlIngestion,
       liveTelemetry, setLiveTelemetry, recentRecords, assessment,
+      vfdDiagnostics, vfdDiagnostic: vfdDiagnostics[selectedAsset] || null,
       timeRange, setTimeRange, historyData, setHistoryData,
       loadingHistory, lastPacketTime, userSetpoints, setUserSetpoints,
       refreshHistory: () => fetchHistory(selectedAsset, timeRange)

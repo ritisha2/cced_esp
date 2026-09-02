@@ -379,6 +379,25 @@ async def disconnect_mqtt():
     })
     return {"status": "disconnected"}
 
+
+# ----------------- VFD Diagnostic Endpoints (ESP_APM_models) ----------------- #
+# Primary read path for esp_agent's LiveDataBridge to consume live
+# WellDiagnosticEngine output without cross-process JSONL tailing.
+from backend.services.vfd_diagnostic_service import vfd_diagnostic_service
+
+@app.get("/api/vfd/diagnostics/{well_id}")
+async def get_vfd_diagnostic(well_id: str):
+    """Return the latest ESP_APM_models diagnosis for a single well."""
+    result = vfd_diagnostic_service.get_latest(well_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"No VFD diagnostic available yet for well '{well_id}'.")
+    return result
+
+@app.get("/api/vfd/diagnostics")
+async def get_all_vfd_diagnostics():
+    """Return the latest ESP_APM_models diagnosis for every well seen so far."""
+    return {"wells": vfd_diagnostic_service.get_all_latest()}
+
 # labelled_db / unlabelled_db / get_database already imported at the top
 
 @app.get("/api/database/browse")
