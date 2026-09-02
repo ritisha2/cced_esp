@@ -6,6 +6,26 @@
 
 const AGENT_BASE_URL = '/api/agent';
 
+// ── A4.T1: Session identity ───────────────────────────────────────────────
+// One UUID per browser tab, persisted in localStorage so it survives a page
+// refresh but starts fresh in a new tab (sessionStorage would only survive
+// within the same tab without reload). Per Plan.md A4.T1.
+function _getOrCreateSessionId() {
+  try {
+    let sid = localStorage.getItem('esp_apm_session_id');
+    if (!sid) {
+      sid = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      localStorage.setItem('esp_apm_session_id', sid);
+    }
+    return sid;
+  } catch (_) {
+    // localStorage unavailable (e.g. private mode with storage blocked)
+    return `anon-${Date.now()}`;
+  }
+}
+
+const SESSION_ID = _getOrCreateSessionId();
+
 export const agentApi = {
   /**
    * Pre-warm LLM Gateway & Supervisor graph on frontend initialization to eliminate cold start.
@@ -46,11 +66,13 @@ export const agentApi = {
    */
   async streamAgentRun({ user_query, asset_id }, onEvent) {
     try {
+      // A4.T2: X-Session-ID sent on the stream path
       const response = await fetch(`${AGENT_BASE_URL}/agent/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/x-ndjson'
+          'Accept': 'application/x-ndjson',
+          'X-Session-ID': SESSION_ID,
         },
         body: JSON.stringify({
           user_query: user_query || 'Diagnose asset operational status',
@@ -109,9 +131,13 @@ export const agentApi = {
    * Fallback synchronous run request.
    */
   async runAgent({ user_query, asset_id }) {
+    // A4.T2: X-Session-ID sent on the run path too
     const response = await fetch(`${AGENT_BASE_URL}/agent/run`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Session-ID': SESSION_ID,
+      },
       body: JSON.stringify({
         user_query,
         asset_id: asset_id || 'FS-010'
