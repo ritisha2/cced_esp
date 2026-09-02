@@ -19,16 +19,21 @@ from typing import Dict, Any, Tuple, Optional
 
 logger = logging.getLogger("opg_transformer")
 
-# -- Make ESP_APM_models importable (workspace root is two levels above cced_esp/backend) ---
+# -- Make ML models importable (located in code/models) ---
 _WORKSPACE_ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-if _WORKSPACE_ROOT not in sys.path:
-    sys.path.insert(0, _WORKSPACE_ROOT)
+_CODE_DIR = os.path.join(_WORKSPACE_ROOT, "code")
+for p in [_CODE_DIR, _WORKSPACE_ROOT]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
 
 try:
-    from ESP_APM_models.calibration_registry import STANDARD_SENSORS, clean_col_key
+    try:
+        from models.calibration_registry import STANDARD_SENSORS, clean_col_key
+    except ImportError:
+        from code.models.calibration_registry import STANDARD_SENSORS, clean_col_key
     _VFD_MODELS_AVAILABLE = True
 except ImportError as e:
-    logger.warning(f"[transformer] ESP_APM_models not importable, extract_vfd_signals will no-op: {e}")
+    logger.warning(f"[transformer] ML models not importable, extract_vfd_signals will no-op: {e}")
     STANDARD_SENSORS = []
     clean_col_key = None
     _VFD_MODELS_AVAILABLE = False

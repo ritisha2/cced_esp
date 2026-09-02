@@ -67,6 +67,11 @@ export const agentApi = {
   async streamAgentRun({ user_query, asset_id }, onEvent) {
     try {
       // A4.T2: X-Session-ID sent on the stream path
+      const payload = {
+        user_query: user_query || 'Diagnose asset operational status',
+        asset_id: (asset_id && typeof asset_id === 'string' && asset_id.trim() !== '') ? asset_id.trim() : null
+      };
+
       const response = await fetch(`${AGENT_BASE_URL}/agent/stream`, {
         method: 'POST',
         headers: {
@@ -74,10 +79,7 @@ export const agentApi = {
           'Accept': 'application/x-ndjson',
           'X-Session-ID': SESSION_ID,
         },
-        body: JSON.stringify({
-          user_query: user_query || 'Diagnose asset operational status',
-          asset_id: asset_id || 'FS-010'
-        })
+        body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
@@ -132,17 +134,21 @@ export const agentApi = {
    */
   async runAgent({ user_query, asset_id }) {
     // A4.T2: X-Session-ID sent on the run path too
-    const response = await fetch(`${AGENT_BASE_URL}/agent/run`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Session-ID': SESSION_ID,
-      },
-      body: JSON.stringify({
+      const payload = {
         user_query,
-        asset_id: asset_id || 'FS-010'
-      })
-    });
+      };
+      if (asset_id && asset_id.trim && asset_id.trim() !== '') {
+        payload.asset_id = asset_id.trim();
+      }
+
+      const response = await fetch(`${AGENT_BASE_URL}/agent/run`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Session-ID': SESSION_ID,
+        },
+        body: JSON.stringify(payload)
+      });
     if (!response.ok) {
       throw new Error(`Agent API request failed with status ${response.status}`);
     }

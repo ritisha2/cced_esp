@@ -1,6 +1,6 @@
 """
 ESP Health Index Predictor (VFD Diagnostic Engine & Physics Fusion).
-Powered by ESP_APM_models.WellDiagnosticEngine:
+Powered by code.models.WellDiagnosticEngine:
 73-Well Statistical Baselines, 13 ESP Fault Modes, Dynamic Physics, and ISO 10816.
 """
 
@@ -11,17 +11,22 @@ from typing import Dict, Any, Optional
 
 logger = logging.getLogger("esp.health_predictor")
 
-# Ensure ESP_APM_models package is on path
+# Ensure code.models package is on path
 _ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
-if _ROOT not in sys.path:
-    sys.path.insert(0, _ROOT)
+_CODE_DIR = os.path.join(_ROOT, "code")
+for p in [_CODE_DIR, _ROOT]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
 
 try:
-    from ESP_APM_models.diagnostic_engine import WellDiagnosticEngine
+    try:
+        from models.diagnostic_engine import WellDiagnosticEngine
+    except ImportError:
+        from code.models.diagnostic_engine import WellDiagnosticEngine
     _ENGINE = WellDiagnosticEngine()
     _ENGINE_READY = True
 except Exception as e:
-    logger.warning(f"ESP_APM_models engine failed to load in cced_esp: {e}")
+    logger.warning(f"code.models engine failed to load in cced_esp: {e}")
     _ENGINE = None
     _ENGINE_READY = False
 
@@ -60,7 +65,7 @@ _DEFAULT_VALUES = {
 
 
 class HealthIndexPredictor:
-    """Predicts calibrated Health Index and diagnostics using ESP_APM_models."""
+    """Predicts calibrated Health Index and diagnostics using code.models."""
 
     def predict(
         self,

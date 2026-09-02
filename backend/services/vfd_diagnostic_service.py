@@ -31,16 +31,21 @@ from typing import Any, Dict, Optional
 
 logger = logging.getLogger("opg.vfd_diagnostic_service")
 
-# -- Make ESP_APM_models importable (workspace root is two levels above cced_esp/backend) ---
+# -- Make ML models importable (located in code/models) ---
 _WORKSPACE_ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))
-if _WORKSPACE_ROOT not in sys.path:
-    sys.path.insert(0, _WORKSPACE_ROOT)
+_CODE_DIR = os.path.join(_WORKSPACE_ROOT, "code")
+for p in [_CODE_DIR, _WORKSPACE_ROOT]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
 
 try:
-    from ESP_APM_models.diagnostic_engine import WellDiagnosticEngine
+    try:
+        from models.diagnostic_engine import WellDiagnosticEngine
+    except ImportError:
+        from code.models.diagnostic_engine import WellDiagnosticEngine
     _ENGINE_IMPORTABLE = True
 except Exception as e:  # pragma: no cover — defensive, never block the MQTT pipeline
-    logger.warning(f"[vfd_diagnostic_service] ESP_APM_models not importable: {e}")
+    logger.warning(f"[vfd_diagnostic_service] ML models not importable: {e}")
     WellDiagnosticEngine = None  # type: ignore
     _ENGINE_IMPORTABLE = False
 

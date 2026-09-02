@@ -8,16 +8,16 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api/agent': {
-        target: 'http://127.0.0.1:8090',
+        target: process.env.VITE_AGENT_API_BASE || 'http://127.0.0.1:8090',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/agent/, '/api/ui'),
       },
       '/api': {
-        target: 'http://127.0.0.1:8000',
+        target: process.env.VITE_CORE_API_BASE || 'http://127.0.0.1:8000',
         changeOrigin: true,
       },
       '/ws': {
-        target: 'ws://127.0.0.1:8000',
+        target: (process.env.VITE_CORE_API_BASE || 'http://127.0.0.1:8000').replace(/^http/, 'ws'),
         ws: true,
       },
     },

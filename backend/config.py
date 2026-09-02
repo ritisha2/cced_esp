@@ -15,7 +15,18 @@ DATA_DIR = BASE_DIR / "data"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 LABELLED_DB_PATH = str(DATA_DIR / "labelled.db")
 UNLABELLED_DB_PATH = str(DATA_DIR / "unlabelled.db")
+HISTORIAN_DB_PATH = str(DATA_DIR / "historian" / "unlabelled_recovered.db")
 DB_PATH = UNLABELLED_DB_PATH
+
+# Valid Authorized Broker IDs for ML Telemetry Polling API
+VALID_BROKER_IDS = {
+    "BROKER-DEMO-001",
+    "CCED-ML-TEST-01",
+    "OPG-SECURE-01",
+    "DEFAULT_DEMO_BROKER",
+    "MQTT-SECURE-BROKER-01",
+    "OPG-BROKER-PROD",
+}
 
 class MQTTConfig(BaseModel):
     broker_host: str = os.getenv("MQTT_BROKER_HOST", "192.168.1.155")

@@ -11,6 +11,8 @@ logger = logging.getLogger("opg.database")
 class Database:
     def __init__(self, db_path: str = DB_PATH):
         self.db_path = db_path
+        self._counts_cache = None
+        self._counts_cache_time = 0.0
 
     async def _get_connection(self):
         conn = await aiosqlite.connect(self.db_path, timeout=10.0)
@@ -452,25 +454,42 @@ class Database:
                 return data
 
     async def get_total_counts(self) -> Dict[str, Any]:
-        """Fetch top-level KPI metrics."""
-        async with aiosqlite.connect(self.db_path) as db:
-            db.row_factory = aiosqlite.Row
-            async with db.execute("""
-                SELECT 
-                    COUNT(*) as total_records,
-                    SUM(CASE WHEN data_category = 'LABELLED' THEN 1 ELSE 0 END) as total_labelled,
-                    SUM(CASE WHEN data_category = 'UNLABELLED' THEN 1 ELSE 0 END) as total_unlabelled,
-                    COUNT(DISTINCT asset_id) as total_assets,
-                    COUNT(DISTINCT well_id) as total_wells,
-                    MAX(timestamp) as last_ingested_at,
-                    SUM(CASE WHEN status != 'NORMAL' AND data_category = 'LABELLED' THEN 1 ELSE 0 END) as total_alerts
-                FROM opg_well_telemetry
-            """) as cursor:
-                row = await cursor.fetchone()
-                return dict(row) if row else {
-                    "total_records": 0, "total_labelled": 0, "total_unlabelled": 0,
-                    "total_assets": 0, "total_wells": 0, "last_ingested_at": None, "total_alerts": 0
-                }
+        """Fetch top-level KPI metrics with 5s caching to prevent disk locking on large DBs."""
+        import time
+        now = time.time()
+        if self._counts_cache is not None and (now - self._counts_cache_time) < 5.0:
+            return self._counts_cache
+
+        try:
+            async with aiosqlite.connect(self.db_path, timeout=5.0) as db:
+                db.row_factory = aiosqlite.Row
+                async with db.execute("""
+                    SELECT 
+                        COUNT(*) as total_records,
+                        SUM(CASE WHEN data_category = 'LABELLED' THEN 1 ELSE 0 END) as total_labelled,
+                        SUM(CASE WHEN data_category = 'UNLABELLED' THEN 1 ELSE 0 END) as total_unlabelled,
+                        COUNT(DISTINCT asset_id) as total_assets,
+                        COUNT(DISTINCT well_id) as total_wells,
+                        MAX(timestamp) as last_ingested_at,
+                        SUM(CASE WHEN status != 'NORMAL' AND data_category = 'LABELLED' THEN 1 ELSE 0 END) as total_alerts
+                    FROM opg_well_telemetry
+                """) as cursor:
+                    row = await cursor.fetchone()
+                    result = dict(row) if row else {
+                        "total_records": 0, "total_labelled": 0, "total_unlabelled": 0,
+                        "total_assets": 0, "total_wells": 0, "last_ingested_at": None, "total_alerts": 0
+                    }
+                    self._counts_cache = result
+                    self._counts_cache_time = now
+                    return result
+        except Exception as ex:
+            logger.warning(f"Error querying get_total_counts: {ex}")
+            if self._counts_cache is not None:
+                return self._counts_cache
+            return {
+                "total_records": 0, "total_labelled": 0, "total_unlabelled": 0,
+                "total_assets": 0, "total_wells": 0, "last_ingested_at": None, "total_alerts": 0
+            }
 
     async def get_database_detailed_stats(self) -> Dict[str, Any]:
         """Fetch comprehensive database storage metrics, file size on disk, categorized counts, and asset-wise breakdown."""

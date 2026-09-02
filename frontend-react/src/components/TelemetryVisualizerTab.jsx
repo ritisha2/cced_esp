@@ -35,6 +35,23 @@ export const TelemetryVisualizerTab = ({ chartPayload }) => {
   const rawData = chartPayload.data || [];
   const title = chartPayload.title || 'Telemetry & Trend Curve';
 
+  if (!rawData.length) {
+    return (
+      <div style={{
+        padding: '36px 16px',
+        textAlign: 'center',
+        color: 'var(--text-muted, #64748b)',
+        fontSize: '0.78rem'
+      }}>
+        <Activity size={24} color="var(--accent-blue, #0284c7)" style={{ marginBottom: '8px', opacity: 0.6 }} />
+        <div style={{ fontWeight: '600', color: 'var(--text-primary, #0f172a)', marginBottom: '4px' }}>
+          {title}
+        </div>
+        <div>No historical time-series telemetry available for this asset.</div>
+      </div>
+    );
+  }
+
   // Transform Plotly/NDJSON traces into tabular data for Recharts
   const { chartData, seriesConfigs } = useMemo(() => {
     if (!rawData.length) return { chartData: [], seriesConfigs: [] };

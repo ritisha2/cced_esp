@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useTelemetry } from '../context/TelemetryContext';
 import { agentApi } from '../services/agentApi';
+import { normalizeAgentEvent } from '../services/agentResponseNormalizer';
 import { AgentMarkdownRenderer } from './AgentMarkdownRenderer';
 import { GenerativeChartBlock } from './GenerativeChartBlock';
 import { AgentResponseDeck } from './AgentResponseDeck';
@@ -18,11 +19,14 @@ import {
   CheckCircle2,
   AlertTriangle,
   RefreshCw,
-  Download
+  Download,
+  Pin
 } from 'lucide-react';
 
 export const AgentFloatingDock = () => {
   const { selectedAsset } = useTelemetry();
+  const [pinnedAsset, setPinnedAsset] = useState(null);
+  const [lastUserQuery, setLastUserQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [panelWidth, setPanelWidth] = useState(480);
@@ -90,10 +94,12 @@ export const AgentFloatingDock = () => {
     };
   }, [isResizing, resize, stopResizing]);
 
-  // Real Streaming Agent Message Handler
+  // Real Streaming Agent Message Handler (Plan.md Phase F1.1 & F1.2)
   const handleSendMessage = (queryText) => {
     const text = queryText || inputQuery;
     if (!text.trim() || isLoading) return;
+
+    setLastUserQuery(text);
 
     const userMsgId = `user-${Date.now()}`;
     const agentMsgId = `agent-${Date.now()}`;
@@ -106,6 +112,7 @@ export const AgentFloatingDock = () => {
         id: agentMsgId,
         sender: 'agent',
         text: '',
+        blocks: [],
         status: 'Initiating Supervisor Agent...',
         timestamp
       }
@@ -116,53 +123,39 @@ export const AgentFloatingDock = () => {
     setIsLoading(true);
 
     let accumulatedText = '';
+    let currentBlocks = [];
+
+    // F1.1: Only send pinned asset if explicitly pinned by operator; otherwise null
+    const targetAsset = pinnedAsset || null;
 
     agentApi.streamAgentRun(
-      { user_query: text, asset_id: selectedAsset || 'FS-010' },
+      { user_query: text, asset_id: targetAsset },
       (evt) => {
-        if (evt.type === 'status') {
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === agentMsgId ? { ...msg, status: evt.message } : msg
-            )
-          );
-        } else if (evt.type === 'text_delta') {
-          accumulatedText += evt.delta;
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === agentMsgId
-                ? { ...msg, status: null, text: accumulatedText }
-                : msg
-            )
-          );
-        } else if (evt.type === 'advisory') {
-          const adv = evt.advisory;
-          const evList = adv?.evidence || [];
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === agentMsgId
-                ? {
-                    ...msg,
-                    evidence: evList,
-                    actionCard: adv?.recommended_action ? {
-                      title: adv.recommended_action.action_title,
-                      urgency: adv.recommended_action.urgency || 'MEDIUM',
-                      confidence: adv.confidence_score || 0.85
-                    } : (adv?.recommendation ? {
-                      title: adv.recommendation,
-                      urgency: 'HIGH',
-                      confidence: adv.confidence || 0.9
-                    } : msg.actionCard)
-                  }
-                : msg
-            )
-          );
-        } else if (evt.type === 'generative_ui') {
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === agentMsgId ? { ...msg, chart: evt } : msg
-            )
-          );
+        if (evt.type === 'text_delta') {
+          accumulatedText += evt.delta || '';
+        }
+
+        currentBlocks = normalizeAgentEvent(evt, currentBlocks);
+
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === agentMsgId
+              ? {
+                  ...msg,
+                  blocks: currentBlocks,
+                  text: accumulatedText || (currentBlocks.find((b) => b.kind === 'text')?.content || ''),
+                  status:
+                    evt.type === 'status'
+                      ? evt.message
+                      : evt.type === 'done' || evt.type === 'advisory'
+                      ? null
+                      : msg.status
+                }
+              : msg
+          )
+        );
+
+        if (evt.type === 'generative_ui') {
           setCanvasArtifacts((prev) => [
             {
               id: evt.chart_id || `art-${Date.now()}`,
@@ -179,19 +172,32 @@ export const AgentFloatingDock = () => {
       }
     ).catch((err) => {
       console.warn('[AgentFloatingDock] Error streaming agent run:', err);
+      const errorEvent = {
+        type: 'error',
+        message: err.message || 'Unable to connect to Agent Jane gateway on port :8090.',
+        errorType: 'transport',
+        canRetry: true
+      };
+      currentBlocks = normalizeAgentEvent(errorEvent, currentBlocks);
+
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === agentMsgId
             ? {
                 ...msg,
                 status: null,
-                text: `⚠️ Unable to connect to Agent Jane backend.\n\n*Note:* Start the agent gateway (\`run_agent_server.py\` on port \`:8090\`) for live execution.`
+                blocks: currentBlocks,
+                text: '⚠️ Communication Error'
               }
             : msg
         )
       );
       setIsLoading(false);
     });
+  };
+
+  const handleSelectSuggestion = (assetId) => {
+    handleSendMessage(assetId);
   };
 
   const handleExportLog = () => {
@@ -371,6 +377,34 @@ export const AgentFloatingDock = () => {
               }}>
                 Agent Jane
               </span>
+
+              {/* F3.T2: Context Chip */}
+              {selectedAsset && (
+                <button
+                  type="button"
+                  onClick={() => setPinnedAsset(pinnedAsset ? null : selectedAsset)}
+                  title={pinnedAsset ? "Context pinned: Click to clear" : `Click to pin ${selectedAsset} context to chat`}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    fontSize: '0.66rem',
+                    fontFamily: 'var(--font-mono, monospace)',
+                    fontWeight: '600',
+                    backgroundColor: pinnedAsset ? 'rgba(2, 132, 199, 0.15)' : 'var(--bg-secondary)',
+                    border: pinnedAsset ? '1px solid var(--accent-blue, #0284c7)' : '1px dashed var(--border-color)',
+                    color: pinnedAsset ? 'var(--accent-blue, #0284c7)' : 'var(--text-muted)',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <Pin size={10} style={{ transform: pinnedAsset ? 'rotate(45deg)' : 'none' }} />
+                  <span>{pinnedAsset ? `Pinned: ${pinnedAsset}` : `Context: ${selectedAsset}`}</span>
+                  {pinnedAsset && <X size={9} />}
+                </button>
+              )}
             </div>
 
             {/* Minimal Header Actions */}
@@ -542,7 +576,7 @@ export const AgentFloatingDock = () => {
                         <span>{msg.status}</span>
                       </div>
                     )}
-                    {!msg.text ? (
+                    {(!msg.text && (!msg.blocks || msg.blocks.length === 0)) ? (
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -555,7 +589,11 @@ export const AgentFloatingDock = () => {
                         </span>
                       </div>
                     ) : (
-                      <AgentResponseDeck message={msg} />
+                      <AgentResponseDeck
+                        message={msg}
+                        onSelectSuggestion={handleSelectSuggestion}
+                        onRetry={() => handleSendMessage(lastUserQuery)}
+                      />
                     )}
                   </div>
                 )}
@@ -669,6 +707,34 @@ export const AgentFloatingDock = () => {
               <span style={{ fontSize: '0.92rem', fontWeight: '700', color: 'var(--text-primary)' }}>
                 Agent Jane Workspace
               </span>
+
+              {/* F3.T2: Context Chip */}
+              {selectedAsset && (
+                <button
+                  type="button"
+                  onClick={() => setPinnedAsset(pinnedAsset ? null : selectedAsset)}
+                  title={pinnedAsset ? "Context pinned: Click to clear" : `Click to pin ${selectedAsset} context to chat`}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    fontSize: '0.66rem',
+                    fontFamily: 'var(--font-mono, monospace)',
+                    fontWeight: '600',
+                    backgroundColor: pinnedAsset ? 'rgba(2, 132, 199, 0.15)' : 'var(--bg-secondary)',
+                    border: pinnedAsset ? '1px solid var(--accent-blue, #0284c7)' : '1px dashed var(--border-color)',
+                    color: pinnedAsset ? 'var(--accent-blue, #0284c7)' : 'var(--text-muted)',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <Pin size={10} style={{ transform: pinnedAsset ? 'rotate(45deg)' : 'none' }} />
+                  <span>{pinnedAsset ? `Pinned: ${pinnedAsset}` : `Context: ${selectedAsset}`}</span>
+                  {pinnedAsset && <X size={9} />}
+                </button>
+              )}
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -780,7 +846,7 @@ export const AgentFloatingDock = () => {
                       </div>
                     )}
 
-                    {!msg.text ? (
+                    {(!msg.text && (!msg.blocks || msg.blocks.length === 0)) ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 0' }}>
                         <RefreshCw size={14} className="live-pulse" color="var(--primary)" />
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
@@ -788,7 +854,11 @@ export const AgentFloatingDock = () => {
                         </span>
                       </div>
                     ) : (
-                      <AgentResponseDeck message={msg} />
+                      <AgentResponseDeck
+                        message={msg}
+                        onSelectSuggestion={handleSelectSuggestion}
+                        onRetry={() => handleSendMessage(lastUserQuery)}
+                      />
                     )}
                   </div>
                 )}
