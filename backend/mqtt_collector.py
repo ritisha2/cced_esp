@@ -7,6 +7,7 @@ from typing import Dict, Any, List, Set, Optional, Callable
 import paho.mqtt.client as mqtt
 from backend.config import MQTTConfig, IngestionState
 from backend.database import db, labelled_db, unlabelled_db
+from backend.database_normalized import normalized_db
 from backend.transformer import transform_mqtt_payload
 from backend.services.vfd_diagnostic_service import vfd_diagnostic_service
 
@@ -363,6 +364,7 @@ class MQTTCollector:
                     await labelled_db.insert_telemetry_batch(labelled_batch)
                 if unlabelled_batch:
                     await unlabelled_db.insert_telemetry_batch(unlabelled_batch)
+                    await normalized_db.insert_batch(unlabelled_batch)
 
                 # Rate-limited WebSocket broadcast using unlabelled data as ground truth
                 now = time.time()

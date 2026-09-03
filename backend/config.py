@@ -15,6 +15,7 @@ DATA_DIR = BASE_DIR / "data"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 LABELLED_DB_PATH = str(DATA_DIR / "labelled.db")
 UNLABELLED_DB_PATH = str(DATA_DIR / "unlabelled.db")
+NORMALIZED_DB_PATH = str(DATA_DIR / "normalized.db")
 HISTORIAN_DB_PATH = str(DATA_DIR / "historian" / "unlabelled_recovered.db")
 DB_PATH = UNLABELLED_DB_PATH
 

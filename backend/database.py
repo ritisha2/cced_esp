@@ -141,6 +141,15 @@ class Database:
                 raw_val = r.get("raw_payload", {})
                 raw_str = raw_val if isinstance(raw_val, str) else json.dumps(raw_val)
 
+                # Native VFD columns — safely coerce; None stays None (SQL NULL)
+                def _f(v):
+                    if v is None:
+                        return None
+                    try:
+                        return float(v)
+                    except (TypeError, ValueError):
+                        return None
+
                 rows.append((
                     r.get("timestamp", datetime.now(timezone.utc).isoformat()),
                     r.get("asset_id", "UNKNOWN"),
@@ -164,7 +173,17 @@ class Database:
                     r.get("operating_state", "running"),
                     r.get("trip_cause", "") or "",
                     r.get("status", "NORMAL"),
-                    raw_str
+                    raw_str,
+                    # ── Native 14-parameter VFD columns (previously silently dropped) ──
+                    _f(r.get("discharge_pressure_psi")),
+                    _f(r.get("intake_temperature_c")),
+                    _f(r.get("motor_temperature_c")),
+                    _f(r.get("whp_psi")),
+                    _f(r.get("flp_psi")),
+                    _f(r.get("annulus_pressure_psi")),
+                    _f(r.get("leak_current_ct")),
+                    _f(r.get("dhg_current")),
+                    int(r["vfd_status"]) if r.get("vfd_status") is not None else None,
                 ))
 
             conn = await self._get_connection()
@@ -176,8 +195,14 @@ class Database:
                         pressure_psi, intake_pressure_psi, temperature_c, flow_rate_bpd,
                         frequency_hz, motor_current_a, motor_voltage_v, vibration_g,
                         water_cut_pct, gas_flow_mscfd, choke_size_pct,
-                        operating_state, trip_cause, status, raw_payload
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        operating_state, trip_cause, status, raw_payload,
+                        discharge_pressure_psi, intake_temperature_c, motor_temperature_c,
+                        whp_psi, flp_psi, annulus_pressure_psi,
+                        leak_current_ct, dhg_current, vfd_status
+                    ) VALUES (
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?
+                    )
                 """, rows)
                 await conn.commit()
                 return len(rows)
