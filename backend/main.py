@@ -143,7 +143,6 @@ async def lifespan(app: FastAPI):
 from backend.api.validation_routes import validation_router
 from backend.api.learning_routes import learning_router
 from backend.api.historian_routes import historian_router
-from backend.api.ml_telemetry_routes import router as ml_telemetry_router
 
 app = FastAPI(title="OPG Wells Telemetry & ESP Intelligence Platform", lifespan=lifespan)
 app.include_router(esp_router)
@@ -151,7 +150,6 @@ app.include_router(historian_router)
 app.include_router(replay_router)
 app.include_router(validation_router)
 app.include_router(learning_router)
-app.include_router(ml_telemetry_router)
 
 
 
