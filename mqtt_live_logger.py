@@ -104,8 +104,15 @@ def on_message(client, userdata, msg):
         except Exception:
             data = {}
         
-        card = format_card(msg_counter, topic, data, payload_str)
-        print(card, flush=True)
+        if userdata.get("raw"):
+            print(f"\n{CLR_CYAN}[{datetime.now().strftime('%H:%M:%S')}] #{msg_counter} TOPIC: {topic}{CLR_RESET}", flush=True)
+            try:
+                print(json.dumps(data, indent=2), flush=True)
+            except Exception:
+                print(payload_str, flush=True)
+        else:
+            card = format_card(msg_counter, topic, data, payload_str)
+            print(card, flush=True)
     except Exception as e:
         print(f"[{datetime.now().strftime('%H:%M:%S')}] {topic}: Error decoding: {e}", flush=True)
 
@@ -115,6 +122,7 @@ def main():
     parser.add_argument("--host", "-H", type=str, default="192.168.1.155", help="MQTT Broker IP address (default: 192.168.1.155)")
     parser.add_argument("--port", "-p", type=int, default=1883, help="MQTT Broker Port (default: 1883)")
     parser.add_argument("--topic", "-t", type=str, default="esp/v1/+/telemetry", help="MQTT Topic to subscribe to (default: esp/v1/+/telemetry)")
+    parser.add_argument("--raw", action="store_true", help="Print verbatim raw JSON payload directly as received")
     parser.add_argument("--username", "-u", type=str, default=None, help="MQTT Username (optional)")
     parser.add_argument("--password", "-P", type=str, default=None, help="MQTT Password (optional)")
     args = parser.parse_args()
@@ -122,7 +130,8 @@ def main():
     userdata = {
         "host": args.host,
         "port": args.port,
-        "topic": args.topic
+        "topic": args.topic,
+        "raw": args.raw
     }
 
     client_id = f"esp_card_logger_{int(time.time())}"
